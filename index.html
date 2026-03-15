@@ -465,6 +465,39 @@
         </div>
       </div>
 
+      <div class="form-grid" style="margin-bottom:24px;">
+        <div class="form-card">
+          <div class="form-card-title"><span>✍</span> Authorised Signature</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:16px;">Appears on the PDF above "Authorised Sign". Use a signature on white/transparent background.</div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:16px;">
+            <img id="settings-sign-preview" src="" alt="Signature" style="display:none;max-width:200px;max-height:80px;object-fit:contain;border-radius:8px;border:1px solid var(--border);background:white;padding:8px;" />
+            <div id="settings-sign-placeholder" style="width:200px;height:80px;border:2px dashed var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px;">No signature yet</div>
+            <label style="cursor:pointer;width:100%;">
+              <div class="btn btn-ghost" style="width:100%;justify-content:center;">↑ Upload Signature</div>
+              <input type="file" id="settings-sign-upload" accept="image/*" style="display:none" onchange="handleSignatureUpload(this)" />
+            </label>
+            <button class="btn btn-ghost" style="width:100%;justify-content:center;color:var(--overdue);border-color:var(--overdue);" onclick="clearSignature()">Remove Signature</button>
+          </div>
+          <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:12px;">PNG with transparent background works best.</div>
+        </div>
+
+        <div class="form-card">
+          <div class="form-card-title"><span>👁</span> Signature Preview</div>
+          <div style="background:white;border:1px solid var(--border);border-radius:8px;padding:20px;margin-bottom:12px;">
+            <div style="display:flex;justify-content:flex-end;">
+              <div style="width:160px;text-align:center;">
+                <div id="sign-preview-img-wrap" style="height:60px;display:flex;align-items:center;justify-content:center;margin-bottom:8px;">
+                  <img id="sign-preview-img" src="" style="display:none;max-width:150px;max-height:56px;object-fit:contain;" />
+                  <div id="sign-preview-empty" style="color:#ccc;font-size:12px;">signature here</div>
+                </div>
+                <div style="border-top:1px solid #555;padding-top:5px;font-size:11px;color:#888;">Authorised Sign</div>
+              </div>
+            </div>
+          </div>
+          <div style="font-size:11px;color:var(--muted);">This is how the signature area will look on your PDF invoice.</div>
+        </div>
+      </div>
+
       <div class="form-card" style="margin-bottom:24px;">
         <div class="form-card-title"><span>🎨</span> Brand Color</div>
         <div class="form-label" style="margin-bottom:12px;">This color is used on your PDF invoice — bars, total box, accents</div>
@@ -543,7 +576,8 @@
 let currentUser = null
 let allInvoices = []
 let logoDataUrl = null
-let createMode = 'invoice' // 'invoice' or 'estimate'
+let signatureDataUrl = null
+let createMode = 'invoice'
 
 // ── AUTH ──────────────────────────────────────────────────
 function switchAuthTab(tab, el) {
@@ -925,8 +959,8 @@ async function loadCompanySettings() {
   if (data) {
     companySettings = data
     logoDataUrl = data.logo_url || null
+    signatureDataUrl = data.signature_url || null
 
-    // Fill settings form
     document.getElementById('settings-name').value = data.name || ''
     document.getElementById('settings-email').value = data.email || ''
     document.getElementById('settings-phone').value = data.phone || ''
@@ -945,6 +979,14 @@ async function loadCompanySettings() {
       document.getElementById('settings-logo-preview').src = data.logo_url
       document.getElementById('settings-logo-preview').style.display = 'block'
       document.getElementById('settings-logo-placeholder').style.display = 'none'
+    }
+    if (data.signature_url) {
+      document.getElementById('settings-sign-preview').src = data.signature_url
+      document.getElementById('settings-sign-preview').style.display = 'block'
+      document.getElementById('settings-sign-placeholder').style.display = 'none'
+      document.getElementById('sign-preview-img').src = data.signature_url
+      document.getElementById('sign-preview-img').style.display = 'block'
+      document.getElementById('sign-preview-empty').style.display = 'none'
     }
   }
   updateCreateFormBanner()
@@ -976,7 +1018,8 @@ async function saveCompanySettings() {
     payment_details: document.getElementById('settings-payment-details').value.trim(),
     default_notes: document.getElementById('settings-notes').value.trim(),
     brand_color: document.getElementById('settings-brand-color').value || '#ffc800',
-    logo_url: logoDataUrl || null
+    logo_url: logoDataUrl || null,
+    signature_url: signatureDataUrl || null
   }
 
   const { error } = await db.from('company_settings')
@@ -1011,6 +1054,32 @@ function hexToRgb(hex) {
 function textOnColor(rgb) {
   const lum = (0.299*rgb[0] + 0.587*rgb[1] + 0.114*rgb[2]) / 255
   return lum > 0.5 ? [30,30,30] : [255,255,255]
+}
+
+function handleSignatureUpload(input) {
+  const file = input.files[0]
+  if (!file) return
+  if (file.size > 1024 * 1024) { showToast('❌ Signature must be under 1MB'); return }
+  const reader = new FileReader()
+  reader.onload = e => {
+    signatureDataUrl = e.target.result
+    document.getElementById('settings-sign-preview').src = signatureDataUrl
+    document.getElementById('settings-sign-preview').style.display = 'block'
+    document.getElementById('settings-sign-placeholder').style.display = 'none'
+    document.getElementById('sign-preview-img').src = signatureDataUrl
+    document.getElementById('sign-preview-img').style.display = 'block'
+    document.getElementById('sign-preview-empty').style.display = 'none'
+  }
+  reader.readAsDataURL(file)
+}
+
+function clearSignature() {
+  signatureDataUrl = null
+  document.getElementById('settings-sign-preview').style.display = 'none'
+  document.getElementById('settings-sign-placeholder').style.display = 'flex'
+  document.getElementById('settings-sign-upload').value = ''
+  document.getElementById('sign-preview-img').style.display = 'none'
+  document.getElementById('sign-preview-empty').style.display = 'block'
 }
 
 function handleSettingsLogoUpload(input) {
@@ -1157,119 +1226,126 @@ function downloadPDF() {
   const fmt   = d => d ? new Date(d+'T00:00:00').toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'}) : '—'
   const money = n => '$' + Number(n).toLocaleString('en',{minimumFractionDigits:2})
 
-  // Brand color from company settings (fallback to yellow)
+  // Brand color
   const brandHex = companySettings.brand_color || '#ffc800'
-  const YELLOW   = hexToRgb(brandHex)
-  const TXONCOL  = textOnColor(YELLOW)  // auto dark/light text on brand color
-  const DARK    = [40,  40,  40]
-  const MID     = [110, 110, 110]
-  const LIGHT   = [200, 200, 200]
-  const ROWALT  = [246, 246, 246]
-  const WHITE   = [255, 255, 255]
-  const THEADBG = [50,  50,  50]
+  const BRAND    = hexToRgb(brandHex)
+  const TXONCOL  = textOnColor(BRAND)
+  const DARK     = [40,  40,  40]
+  const MID      = [110, 110, 110]
+  const LIGHT    = [200, 200, 200]
+  const ROWALT   = [246, 246, 246]
+  const WHITE    = [255, 255, 255]
+  const THEADBG  = [50,  50,  50]
 
   // White page
   doc.setFillColor(255,255,255)
   doc.rect(0,0,W,297,'F')
 
-  // Top yellow bar
-  doc.setFillColor(...YELLOW)
-  doc.rect(0,0,W,3,'F')
+  // ── TOP THIN BRAND BAR (full width, 3mm)
+  doc.setFillColor(...BRAND)
+  doc.rect(0, 0, W, 3, 'F')
 
-  // Logo + company name
-  let nameX = L
+  // ── LOGO ONLY (top left, below thin bar)
+  let logoBottomY = 10
   if (companySettings.logo_url) {
-    try { doc.addImage(companySettings.logo_url,'PNG',L,8,16,16); nameX = L+20 } catch(e){}
+    try {
+      doc.addImage(companySettings.logo_url, 'PNG', L, 7, 18, 18)
+      logoBottomY = 28
+    } catch(e) { logoBottomY = 10 }
   }
-  doc.setFont('helvetica','bold').setFontSize(15).setTextColor(...DARK)
-  doc.text(companySettings.name || 'Brand Name', nameX, 16)
-  doc.setFont('helvetica','normal').setFontSize(7).setTextColor(...MID)
-  doc.text(companySettings.email || '', nameX, 21)
 
-  // INVOICE big label top right
-  doc.setFont('helvetica','bold').setFontSize(28).setTextColor(...DARK)
+  // ── THICK BRAND BAR with "INVOICE" inside it
+  // Bar sits below logo area, full width
+  const barY = logoBottomY + 2
+  const barH = 12
+  doc.setFillColor(...BRAND)
+  doc.rect(0, barY, W, barH, 'F')
+
+  // "INVOICE" label right-aligned inside the bar, vertically centred
   const docLabel = inv.status === 'estimate' ? 'ESTIMATE' : 'INVOICE'
-  doc.text(docLabel, R, 20, {align:'right'})
+  doc.setFont('helvetica','bold').setFontSize(14).setTextColor(...TXONCOL)
+  doc.text(docLabel, R, barY + barH/2 + 2.5, { align:'right' })
 
-  // Yellow accent bar below header — left wide bar + small right square
-  doc.setFillColor(...YELLOW)
-  doc.rect(L, 26, R - L - 18, 2.5, 'F')
-  doc.rect(R - 14, 26, 14, 2.5, 'F')
+  // Invoice number inside bar, left side (smaller)
+  doc.setFont('helvetica','normal').setFontSize(8).setTextColor(...TXONCOL)
+  doc.setGState && doc.setGState(doc.GState({ opacity: 0.75 }))
+  doc.text(inv.invoice_number || '#INV-0001', L, barY + barH/2 + 2.5)
+  doc.setGState && doc.setGState(doc.GState({ opacity: 1 }))
 
-  // Invoice to: label
+  // ── INVOICE TO + META (below bar)
+  const sectionY = barY + barH + 10
+
   doc.setFont('helvetica','bold').setFontSize(8.5).setTextColor(...DARK)
-  doc.text('Invoice to:', L, 36)
+  doc.text('Invoice to:', L, sectionY)
 
-  // Client name
   doc.setFont('helvetica','bold').setFontSize(11).setTextColor(...DARK)
-  doc.text(inv.clients?.name || '—', L, 42)
+  doc.text(inv.clients?.name || '—', L, sectionY + 6)
 
-  // Client details
   doc.setFont('helvetica','normal').setFontSize(8).setTextColor(...MID)
-  let cy = 47
+  let cy = sectionY + 11
   if (inv.clients?.email)   { doc.text(inv.clients.email,   L, cy); cy += 4.5 }
   if (inv.clients?.address) { doc.text(inv.clients.address, L, cy) }
 
-  // Right meta: Invoice# / Date / Due Date
+  // Right side meta
   const mLX = 122, mVX = 195
   doc.setFont('helvetica','bold').setFontSize(9).setTextColor(...DARK)
-  doc.text('Invoice #',  mLX, 36)
-  doc.text('Date',       mLX, 43)
-  doc.text('Due Date',   mLX, 50)
+  doc.text('Invoice #', mLX, sectionY)
+  doc.text('Date',      mLX, sectionY + 7)
+  doc.text('Due Date',  mLX, sectionY + 14)
   doc.setFont('helvetica','normal').setFontSize(9).setTextColor(...MID)
-  doc.text(inv.invoice_number || '—',  mVX, 36, {align:'right'})
-  doc.text(fmt(inv.issue_date),         mVX, 43, {align:'right'})
-  doc.text(fmt(inv.due_date),           mVX, 50, {align:'right'})
+  doc.text(inv.invoice_number || '—', mVX, sectionY,      { align:'right' })
+  doc.text(fmt(inv.issue_date),        mVX, sectionY + 7,  { align:'right' })
+  doc.text(fmt(inv.due_date),          mVX, sectionY + 14, { align:'right' })
 
-  // Line items table
+  // ── LINE ITEMS TABLE
+  const tableStartY = sectionY + 24
   const rows = (inv.line_items||[]).map((l,i) => [
     String(i+1),
     l.description || '—',
-    {content: money(l.rate),            styles:{halign:'right'}},
-    {content: String(l.quantity),       styles:{halign:'center'}},
-    {content: money(l.quantity*l.rate), styles:{halign:'right', fontStyle:'bold'}},
+    { content: money(l.rate),             styles:{ halign:'right' } },
+    { content: String(l.quantity),        styles:{ halign:'center' } },
+    { content: money(l.quantity*l.rate),  styles:{ halign:'right', fontStyle:'bold' } },
   ])
 
   doc.autoTable({
-    startY: 58,
+    startY: tableStartY,
     head: [['SL.', 'Item Description', 'Price', 'Qty.', 'Total']],
     body: rows,
     theme: 'plain',
-    margin: {left:L, right:14},
+    margin: { left:L, right:14 },
     styles: {
       font:'helvetica', fontSize:9,
       textColor: DARK,
-      cellPadding: {top:3.5, bottom:3.5, left:3, right:3},
+      cellPadding: { top:3.5, bottom:3.5, left:3, right:3 },
     },
     headStyles: {
       fillColor: THEADBG,
       textColor: WHITE,
       fontStyle: 'bold',
       fontSize: 8.5,
-      cellPadding: {top:4, bottom:4, left:3, right:3},
+      cellPadding: { top:4, bottom:4, left:3, right:3 },
     },
-    alternateRowStyles: {fillColor: ROWALT},
+    alternateRowStyles: { fillColor: ROWALT },
     columnStyles: {
-      0: {cellWidth:10,  halign:'center'},
-      1: {cellWidth:'auto'},
-      2: {cellWidth:26,  halign:'right'},
-      3: {cellWidth:16,  halign:'center'},
-      4: {cellWidth:26,  halign:'right'},
+      0: { cellWidth:10,  halign:'center' },
+      1: { cellWidth:'auto' },
+      2: { cellWidth:26,  halign:'right' },
+      3: { cellWidth:16,  halign:'center' },
+      4: { cellWidth:26,  halign:'right' },
     },
     tableLineColor: LIGHT,
     tableLineWidth: 0.1,
   })
 
-  // Bottom section
-  const subtotal = (inv.line_items||[]).reduce((s,l)=>s+(l.quantity*l.rate),0)
+  // ── TOTALS
+  const subtotal = (inv.line_items||[]).reduce((s,l) => s+(l.quantity*l.rate), 0)
   const taxRate  = inv.tax_rate || 0
-  const taxAmt   = subtotal*(taxRate/100)
+  const taxAmt   = subtotal * (taxRate/100)
   const grand    = subtotal + taxAmt
-
   const tableEndY = doc.lastAutoTable.finalY
-  let by = tableEndY + 10
+  const tL = 130
 
-  // Left: thank you + terms + payment
+  let by = tableEndY + 10
   doc.setFont('helvetica','bold').setFontSize(9).setTextColor(...DARK)
   doc.text('Thank you for your business', L, by)
 
@@ -1286,60 +1362,66 @@ function downloadPDF() {
     doc.text('Payment Info:', L, by)
     by += 5
     doc.setFont('helvetica','normal').setFontSize(7.5).setTextColor(...MID)
-    const pdLines = doc.splitTextToSize(companySettings.payment_details, 80)
-    pdLines.forEach(line => { doc.text(line, L, by); by += 4.5 })
+    doc.splitTextToSize(companySettings.payment_details, 80)
+        .forEach(line => { doc.text(line, L, by); by += 4.5 })
   }
 
-  // Right: subtotal / tax / total box
   const tBaseY = tableEndY + 10
-  const tL = 130
-
   doc.setFont('helvetica','normal').setFontSize(9).setTextColor(...DARK)
   doc.text('Sub Total:', tL, tBaseY)
-  doc.text(money(subtotal), R, tBaseY, {align:'right'})
-  doc.text('Tax:',       tL, tBaseY + 7)
-  doc.text(taxRate > 0 ? money(taxAmt) : '0.00%', R, tBaseY + 7, {align:'right'})
+  doc.text(money(subtotal), R, tBaseY, { align:'right' })
+  doc.text('Tax:', tL, tBaseY + 7)
+  doc.text(taxRate > 0 ? money(taxAmt) : '0.00%', R, tBaseY + 7, { align:'right' })
 
-  // Yellow total box
+  // Brand-colored total box
   const totBoxY = tBaseY + 12
-  doc.setFillColor(...YELLOW)
+  doc.setFillColor(...BRAND)
   doc.rect(tL, totBoxY, R - tL, 11, 'F')
   doc.setFont('helvetica','bold').setFontSize(10.5).setTextColor(...TXONCOL)
   doc.text('Total:', tL + 3, totBoxY + 7.5)
-  doc.text(money(grand), R - 3, totBoxY + 7.5, {align:'right'})
+  doc.text(money(grand), R - 3, totBoxY + 7.5, { align:'right' })
 
-  // Footer area
-  const footerY = 263
+  // ── FOOTER — pinned to bottom
+  const signAreaY = 252
+  const signLineY = 272
 
-  // Yellow bar + authorised sign
-  doc.setFillColor(...YELLOW)
-  doc.rect(L, footerY, R - L - 42, 2, 'F')
+  // Signature image if available
+  if (companySettings.signature_url) {
+    try {
+      doc.addImage(companySettings.signature_url, 'PNG', R - 50, signAreaY, 46, 18)
+    } catch(e) {}
+  }
+
+  // Authorised sign line (right-aligned)
   doc.setDrawColor(...DARK).setLineWidth(0.3)
-  doc.line(R - 40, footerY + 9, R, footerY + 9)
+  doc.line(R - 50, signLineY, R, signLineY)
   doc.setFont('helvetica','normal').setFontSize(7.5).setTextColor(...MID)
-  doc.text('Authorised Sign', R - 20, footerY + 14, {align:'center'})
+  doc.text('Authorised Sign', R - 25, signLineY + 5, { align:'center' })
+
+  // Full-width brand bar above dark footer
+  doc.setFillColor(...BRAND)
+  doc.rect(0, signLineY + 9, W, 3, 'F')
 
   // Dark footer bar
   doc.setFillColor(...DARK)
-  doc.rect(0, 278, W, 16, 'F')
+  doc.rect(0, signLineY + 12, W, 14, 'F')
   doc.setFont('helvetica','normal').setFontSize(8).setTextColor(200,200,200)
-
   const fi = [
     companySettings.phone   || 'Phone #',
     companySettings.address || 'Address',
     companySettings.website || 'Website',
   ]
-  doc.text(fi[0], L,       287)
-  doc.text(fi[1], W/2,     287, {align:'center'})
-  doc.text(fi[2], R,       287, {align:'right'})
-  doc.setTextColor(...YELLOW)
+  doc.text(fi[0], L,    signLineY + 21)
+  doc.text(fi[1], W/2,  signLineY + 21, { align:'center' })
+  doc.text(fi[2], R,    signLineY + 21, { align:'right' })
+  doc.setTextColor(...BRAND)
   doc.setFontSize(10)
-  doc.text('|', W/2 - 25, 287)
-  doc.text('|', W/2 + 22, 287)
+  doc.text('|', W/2 - 25, signLineY + 21)
+  doc.text('|', W/2 + 22, signLineY + 21)
 
-  // Bottom yellow bar
-  doc.setFillColor(...YELLOW)
-  doc.rect(0, 294, W, 3, 'F')
+  // Bottom brand bar
+  doc.setFillColor(...BRAND)
+  doc.rect(0, signLineY + 26, W, 3, 'F')
 
   doc.save((inv.invoice_number||'invoice')+'.pdf')
   showToast('📄 PDF downloaded!')
