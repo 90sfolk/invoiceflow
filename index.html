@@ -8,9 +8,11 @@
 
 <!-- ✅ STEP 5: Paste your Supabase keys here -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script>
-  const SUPABASE_URL = 'https://qlejmmsizedjpfwicvux.supabase.co'  // ← replace this
-  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFsZWptbXNpemVkanBmd2ljdnV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NTgwMjksImV4cCI6MjA4OTEzNDAyOX0.oq34AdYu4NknnfqPH8v4bfA4Kg9KngEJ089hecFGoRc'                             // ← replace this
+  const SUPABASE_URL = 'https://qlejmmsizedjpfwicvux.supabase.co'
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFsZWptbXNpemVkanBmd2ljdnV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NTgwMjksImV4cCI6MjA4OTEzNDAyOX0.oq34AdYu4NknnfqPH8v4bfA4Kg9KngEJ089hecFGoRc'
   const { createClient } = supabase
   const db = createClient(SUPABASE_URL, SUPABASE_KEY)
 </script>
@@ -350,6 +352,7 @@
         <div style="display:flex;gap:10px;">
           <button class="btn btn-ghost" onclick="showView('invoices', document.querySelector('[onclick*=invoices]'))">← Back</button>
           <button class="btn btn-ghost" id="detail-mark-paid-btn" onclick="markPaidFromDetail()">✓ Mark as Paid</button>
+          <button class="btn btn-ghost" onclick="downloadPDF()">↓ Download PDF</button>
           <button class="btn btn-primary" id="detail-remind-btn" onclick="openReminderFromDetail()">🔔 Send Reminder</button>
         </div>
       </div>
@@ -749,6 +752,121 @@ function openReminderFromDetail() {
     detailInvoice.invoice_number,
     '$' + detailInvoice.total.toLocaleString()
   )
+}
+
+// ── DOWNLOAD PDF ──────────────────────────────────────────
+function downloadPDF() {
+  if (!detailInvoice) return
+  const { jsPDF } = window.jspdf
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' })
+  const inv = detailInvoice
+  const pageW = 210
+
+  // ── Background & accent bar
+  doc.setFillColor(14, 14, 15)
+  doc.rect(0, 0, pageW, 297, 'F')
+  doc.setFillColor(212, 241, 80)
+  doc.rect(0, 0, pageW, 2, 'F')
+
+  // ── Logo
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(22)
+  doc.setTextColor(212, 241, 80)
+  doc.text('InvoiceFlow', 20, 22)
+
+  // ── Invoice number + status badge
+  doc.setFontSize(11)
+  doc.setTextColor(107, 107, 114)
+  doc.text(inv.invoice_number || '#INV', 20, 32)
+
+  const statusColors = { paid: [62,207,142], sent: [124,106,247], overdue: [249,112,102], draft: [107,107,114], pending: [245,166,35] }
+  const sc = statusColors[inv.status] || [107,107,114]
+  doc.setFillColor(...sc)
+  doc.roundedRect(pageW - 50, 24, 30, 8, 2, 2, 'F')
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(9)
+  doc.setTextColor(14, 14, 15)
+  doc.text(inv.status.toUpperCase(), pageW - 35, 29.5, { align: 'center' })
+
+  // ── Divider
+  doc.setDrawColor(42, 42, 46)
+  doc.setLineWidth(0.3)
+  doc.line(20, 38, pageW - 20, 38)
+
+  // ── FROM / TO columns
+  doc.setFontSize(8)
+  doc.setTextColor(107, 107, 114)
+  doc.setFont('helvetica', 'normal')
+  doc.text('FROM', 20, 48)
+  doc.text('BILL TO', 110, 48)
+
+  doc.setFontSize(11)
+  doc.setTextColor(240, 240, 238)
+  doc.setFont('helvetica', 'bold')
+  doc.text(currentUser.email || '—', 20, 56)
+  doc.text(inv.clients?.name || '—', 110, 56)
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9)
+  doc.setTextColor(107, 107, 114)
+  if (inv.clients?.email) doc.text(inv.clients.email, 110, 62)
+  if (inv.clients?.address) doc.text(inv.clients.address, 110, 68)
+
+  // ── Invoice meta grid
+  doc.line(20, 78, pageW - 20, 78)
+
+  const metaY = 86
+  const metaItems = [
+    ['ISSUE DATE', inv.issue_date ? new Date(inv.issue_date + 'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—'],
+    ['DUE DATE',   inv.due_date   ? new Date(inv.due_date   + 'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—'],
+    ['PAYMENT',    inv.payment_method || '—'],
+    ['NOTES',      inv.notes || '—'],
+  ]
+  metaItems.forEach(([label, value], i) => {
+    const x = 20 + (i * 45)
+    doc.setFontSize(7); doc.setTextColor(107,107,114); doc.setFont('helvetica','normal')
+    doc.text(label, x, metaY)
+    doc.setFontSize(9); doc.setTextColor(240,240,238); doc.setFont('helvetica','bold')
+    doc.text(String(value), x, metaY + 6)
+  })
+
+  doc.line(20, metaY + 12, pageW - 20, metaY + 12)
+
+  // ── Line items table
+  const lineRows = (inv.line_items || []).map(l => [
+    l.description || '',
+    String(l.quantity),
+    '$' + Number(l.rate).toLocaleString(),
+    '$' + (l.quantity * l.rate).toLocaleString()
+  ])
+
+  doc.autoTable({
+    startY: metaY + 18,
+    head: [['DESCRIPTION', 'QTY', 'RATE', 'TOTAL']],
+    body: lineRows,
+    theme: 'plain',
+    margin: { left: 20, right: 20 },
+    styles: { font: 'helvetica', fontSize: 9, textColor: [240,240,238], fillColor: [22,22,24], cellPadding: 4 },
+    headStyles: { fontSize: 7, textColor: [107,107,114], fillColor: [14,14,15], fontStyle: 'normal' },
+    alternateRowStyles: { fillColor: [30,30,33] },
+    columnStyles: { 0: { cellWidth: 90 }, 1: { cellWidth: 20, halign:'center' }, 2: { cellWidth: 35, halign:'right' }, 3: { cellWidth: 35, halign:'right' } },
+  })
+
+  // ── Total box
+  const finalY = doc.lastAutoTable.finalY + 8
+  doc.setFillColor(30, 30, 33)
+  doc.roundedRect(pageW - 80, finalY, 60, 18, 3, 3, 'F')
+  doc.setFontSize(8); doc.setTextColor(107,107,114); doc.setFont('helvetica','normal')
+  doc.text('TOTAL DUE', pageW - 50, finalY + 7, { align: 'center' })
+  doc.setFontSize(16); doc.setTextColor(212,241,80); doc.setFont('helvetica','bold')
+  doc.text('$' + inv.total.toLocaleString(), pageW - 50, finalY + 14, { align: 'center' })
+
+  // ── Footer
+  doc.setFontSize(8); doc.setTextColor(42,42,46); doc.setFont('helvetica','normal')
+  doc.text('Generated by InvoiceFlow · invoiceflow-psi.vercel.app', pageW / 2, 285, { align: 'center' })
+
+  doc.save((inv.invoice_number || 'invoice') + '.pdf')
+  showToast('📄 PDF downloaded!')
 }
 
 // ── REMINDER ──────────────────────────────────────────────
