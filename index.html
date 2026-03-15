@@ -11,7 +11,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script>
-  const SUPABASE_URL = 'https://qlejmmsizedjpfwicvux.supabase.co' 
+  const SUPABASE_URL = 'https://qlejmmsizedjpfwicvux.supabase.co'  // ← replace this
   const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFsZWptbXNpemVkanBmd2ljdnV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NTgwMjksImV4cCI6MjA4OTEzNDAyOX0.oq34AdYu4NknnfqPH8v4bfA4Kg9KngEJ089hecFGoRc'
   const { createClient } = supabase
   const db = createClient(SUPABASE_URL, SUPABASE_KEY)
@@ -220,6 +220,7 @@
     <a class="nav-item" onclick="showView('create',this)"><span class="nav-icon">＋</span> New Invoice</a>
     <a class="nav-item" onclick="showView('estimates',this)"><span class="nav-icon">◉</span> Estimates</a>
     <div class="nav-section">Account</div>
+    <a class="nav-item" onclick="showView('settings',this)"><span class="nav-icon">⚙</span> Company Settings</a>
     <a class="nav-item" onclick="handleLogout()"><span class="nav-icon">←</span> Sign Out</a>
     <div class="sidebar-bottom">
       <div class="user-pill">
@@ -294,21 +295,16 @@
       </div>
 
       <div class="form-grid">
-        <div class="form-card">
-          <div class="form-card-title"><span>1</span> From (You)</div>
-          <div class="form-group"><label class="form-label">Your Name / Business</label><input class="form-input" id="from-name" placeholder="Alex Johnson" /></div>
-          <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="from-email" placeholder="you@email.com" /></div>
-          <div class="form-group"><label class="form-label">Address (optional)</label><input class="form-input" id="from-address" placeholder="123 Main St" /></div>
-          <div class="form-group">
-            <label class="form-label">Your Logo (optional)</label>
-            <div style="display:flex;align-items:center;gap:10px;">
-              <img id="logo-preview" src="" alt="" style="display:none;width:48px;height:48px;object-fit:contain;border-radius:6px;border:1px solid var(--border);background:var(--surface2);" />
-              <label style="cursor:pointer;flex:1;">
-                <div class="form-input" style="cursor:pointer;color:var(--muted);text-align:center;" id="logo-label">Click to upload logo</div>
-                <input type="file" id="logo-upload" accept="image/*" style="display:none" onchange="handleLogoUpload(this)" />
-              </label>
-              <button class="icon-btn" onclick="clearLogo()" id="logo-clear" style="display:none;">✕</button>
+        <div class="form-card" style="border-color:var(--accent);border-opacity:.3;">
+          <div class="form-card-title"><span>1</span> From (Your Company)</div>
+          <div id="company-banner" style="display:flex;align-items:center;gap:14px;">
+            <img id="create-logo-preview" src="" style="display:none;width:44px;height:44px;object-fit:contain;border-radius:6px;border:1px solid var(--border);background:var(--surface2);" />
+            <div style="flex:1;">
+              <div id="create-company-name" style="font-weight:500;font-size:14px;color:var(--text);">—</div>
+              <div id="create-company-email" style="font-size:12px;color:var(--muted);margin-top:2px;">—</div>
+              <div id="create-company-address" style="font-size:12px;color:var(--muted);margin-top:1px;"></div>
             </div>
+            <button class="btn btn-ghost" style="font-size:11px;padding:6px 12px;" onclick="showView('settings',document.querySelector('[onclick*=settings]'))">Edit ⚙</button>
           </div>
         </div>
         <div class="form-card">
@@ -432,6 +428,60 @@
       </div>
     </div>
 
+    <!-- COMPANY SETTINGS -->
+    <div class="view" id="view-settings">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Company Settings</div>
+          <div class="page-subtitle">Set once — used on every invoice automatically</div>
+        </div>
+        <button class="btn btn-primary" onclick="saveCompanySettings()">Save Settings</button>
+      </div>
+
+      <div class="form-grid">
+        <div class="form-card">
+          <div class="form-card-title"><span>🏢</span> Company Info</div>
+          <div class="form-group"><label class="form-label">Company / Your Name</label><input class="form-input" id="settings-name" placeholder="Alex Johnson Design" /></div>
+          <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="settings-email" placeholder="you@email.com" /></div>
+          <div class="form-group"><label class="form-label">Phone (optional)</label><input class="form-input" id="settings-phone" placeholder="+1 234 567 8900" /></div>
+          <div class="form-group"><label class="form-label">Address (optional)</label><input class="form-input" id="settings-address" placeholder="123 Main St, City, Country" /></div>
+          <div class="form-group"><label class="form-label">Website (optional)</label><input class="form-input" id="settings-website" placeholder="www.yoursite.com" /></div>
+        </div>
+
+        <div class="form-card">
+          <div class="form-card-title"><span>🖼</span> Company Logo</div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:16px;padding:20px 0;">
+            <img id="settings-logo-preview" src="" alt="Logo" style="display:none;max-width:160px;max-height:100px;object-fit:contain;border-radius:8px;border:1px solid var(--border);background:var(--surface2);padding:8px;" />
+            <div id="settings-logo-placeholder" style="width:160px;height:100px;border:2px dashed var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px;">No logo yet</div>
+            <label style="cursor:pointer;width:100%;">
+              <div class="btn btn-ghost" style="width:100%;justify-content:center;">↑ Upload Logo</div>
+              <input type="file" id="settings-logo-upload" accept="image/*" style="display:none" onchange="handleSettingsLogoUpload(this)" />
+            </label>
+            <button class="btn btn-ghost" style="width:100%;justify-content:center;color:var(--overdue);border-color:var(--overdue);" onclick="clearSettingsLogo()">Remove Logo</button>
+          </div>
+          <div style="font-size:11px;color:var(--muted);text-align:center;">PNG or JPG recommended. Max 1MB.</div>
+        </div>
+      </div>
+
+      <div class="form-card" style="margin-bottom:24px;">
+        <div class="form-card-title"><span>💳</span> Default Payment Info</div>
+        <div class="form-grid" style="margin-bottom:0;">
+          <div class="form-group"><label class="form-label">Default Payment Method</label>
+            <select class="form-input" id="settings-payment-method">
+              <option>Bank Transfer</option><option>PayPal</option><option>Stripe</option><option>Wise</option>
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">Payment Details</label><input class="form-input" id="settings-payment-details" placeholder="Account number, PayPal email, etc." /></div>
+        </div>
+        <div class="form-group"><label class="form-label">Default Invoice Notes</label><input class="form-input" id="settings-notes" placeholder="Thank you for your business!" /></div>
+      </div>
+
+      <div style="display:flex;justify-content:flex-end;gap:12px;">
+        <button class="btn btn-ghost" onclick="showView('dashboard',document.querySelector('[onclick*=dashboard]'))">Cancel</button>
+        <button class="btn btn-primary" onclick="saveCompanySettings()">✓ Save Settings</button>
+      </div>
+    </div>
+
   </main>
 </div>
 
@@ -515,6 +565,7 @@ db.auth.onAuthStateChange((event, session) => {
     document.getElementById('user-email-display').textContent = email
     document.getElementById('user-avatar').textContent = email[0].toUpperCase()
     loadInvoices()
+    loadCompanySettings()
     setupCreateForm()
   } else {
     currentUser = null
@@ -626,8 +677,15 @@ function setupCreateForm() {
   const due = new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0]
   document.getElementById('inv-issue-date').value = today
   document.getElementById('inv-due-date').value = due
-  document.getElementById('from-email').value = currentUser?.email || ''
   document.getElementById('tax-rate').value = 0
+
+  // Auto-fill payment info from company settings
+  if (companySettings.payment_method) {
+    const pm = document.getElementById('inv-payment-method')
+    for (let opt of pm.options) { if (opt.value === companySettings.payment_method) { opt.selected = true; break } }
+  }
+  if (companySettings.payment_details) document.getElementById('inv-payment-details').value = companySettings.payment_details
+  if (companySettings.default_notes) document.getElementById('inv-notes').value = companySettings.default_notes
 
   const isEstimate = createMode === 'estimate'
   const prefix = isEstimate ? '#EST-' : '#INV-'
@@ -638,16 +696,11 @@ function setupCreateForm() {
   document.getElementById('btn-send').style.display = isEstimate ? 'none' : 'inline-flex'
   document.getElementById('btn-save-estimate').style.display = isEstimate ? 'inline-flex' : 'none'
 
-  // Reset logo
-  logoDataUrl = null
-  document.getElementById('logo-preview').style.display = 'none'
-  document.getElementById('logo-label').textContent = 'Click to upload logo'
-  document.getElementById('logo-clear').style.display = 'none'
-
+  updateCreateFormBanner()
   document.getElementById('line-items').innerHTML = ''
   addLine(); addLine()
   calcTotal()
-  createMode = 'invoice' // reset for next time
+  createMode = 'invoice'
 }
 
 // ── LINE ITEMS ────────────────────────────────────────────
@@ -761,7 +814,11 @@ async function viewInvoice(id) {
   document.getElementById('detail-inv-number').textContent = data.invoice_number || '#INV'
   document.getElementById('detail-inv-status').textContent = 'Status: ' + data.status
 
-  document.getElementById('detail-from').innerHTML = `<strong>${currentUser.email}</strong>`
+  document.getElementById('detail-from').innerHTML = `
+    <strong>${companySettings.name || currentUser.email}</strong><br>
+    <span style="color:var(--muted);font-size:12px;">${companySettings.email || ''}</span><br>
+    <span style="color:var(--muted);font-size:12px;">${companySettings.address || ''}</span>
+  `
   document.getElementById('detail-to').innerHTML = `
     <strong>${data.clients?.name || '—'}</strong><br>
     ${data.clients?.email || ''}<br>
@@ -822,6 +879,101 @@ function openReminderFromDetail() {
     detailInvoice.invoice_number,
     '$' + detailInvoice.total.toLocaleString()
   )
+}
+
+// ── COMPANY SETTINGS ─────────────────────────────────────
+let companySettings = {}
+
+async function loadCompanySettings() {
+  const { data } = await db.from('company_settings')
+    .select('*')
+    .eq('user_id', currentUser.id)
+    .single()
+
+  if (data) {
+    companySettings = data
+    logoDataUrl = data.logo_url || null
+
+    // Fill settings form
+    document.getElementById('settings-name').value = data.name || ''
+    document.getElementById('settings-email').value = data.email || ''
+    document.getElementById('settings-phone').value = data.phone || ''
+    document.getElementById('settings-address').value = data.address || ''
+    document.getElementById('settings-website').value = data.website || ''
+    document.getElementById('settings-payment-details').value = data.payment_details || ''
+    document.getElementById('settings-notes').value = data.default_notes || ''
+    const pm = document.getElementById('settings-payment-method')
+    if (data.payment_method) {
+      for (let opt of pm.options) { if (opt.value === data.payment_method) { opt.selected = true; break } }
+    }
+    if (data.logo_url) {
+      document.getElementById('settings-logo-preview').src = data.logo_url
+      document.getElementById('settings-logo-preview').style.display = 'block'
+      document.getElementById('settings-logo-placeholder').style.display = 'none'
+    }
+  }
+  updateCreateFormBanner()
+}
+
+function updateCreateFormBanner() {
+  const s = companySettings
+  document.getElementById('create-company-name').textContent = s.name || '— Set up your company first'
+  document.getElementById('create-company-email').textContent = s.email || ''
+  document.getElementById('create-company-address').textContent = s.address || ''
+  const logoEl = document.getElementById('create-logo-preview')
+  if (s.logo_url) {
+    logoEl.src = s.logo_url
+    logoEl.style.display = 'block'
+  } else {
+    logoEl.style.display = 'none'
+  }
+}
+
+async function saveCompanySettings() {
+  const payload = {
+    user_id: currentUser.id,
+    name: document.getElementById('settings-name').value.trim(),
+    email: document.getElementById('settings-email').value.trim(),
+    phone: document.getElementById('settings-phone').value.trim(),
+    address: document.getElementById('settings-address').value.trim(),
+    website: document.getElementById('settings-website').value.trim(),
+    payment_method: document.getElementById('settings-payment-method').value,
+    payment_details: document.getElementById('settings-payment-details').value.trim(),
+    default_notes: document.getElementById('settings-notes').value.trim(),
+    logo_url: logoDataUrl || null
+  }
+
+  const { error } = await db.from('company_settings')
+    .upsert(payload, { onConflict: 'user_id' })
+
+  if (error) { showToast('❌ Error saving: ' + error.message); return }
+
+  companySettings = payload
+  updateCreateFormBanner()
+  showToast('✅ Company settings saved!')
+  showView('dashboard', document.querySelector('[onclick*=dashboard]'))
+}
+
+function handleSettingsLogoUpload(input) {
+  const file = input.files[0]
+  if (!file) return
+  if (file.size > 1024 * 1024) { showToast('❌ Logo must be under 1MB'); return }
+  const reader = new FileReader()
+  reader.onload = e => {
+    logoDataUrl = e.target.result
+    const preview = document.getElementById('settings-logo-preview')
+    preview.src = logoDataUrl
+    preview.style.display = 'block'
+    document.getElementById('settings-logo-placeholder').style.display = 'none'
+  }
+  reader.readAsDataURL(file)
+}
+
+function clearSettingsLogo() {
+  logoDataUrl = null
+  document.getElementById('settings-logo-preview').style.display = 'none'
+  document.getElementById('settings-logo-placeholder').style.display = 'flex'
+  document.getElementById('settings-logo-upload').value = ''
 }
 
 // ── LOGO UPLOAD ───────────────────────────────────────────
@@ -949,13 +1101,13 @@ function downloadPDF() {
   doc.rect(0, 0, pageW, 2, 'F')
 
   // Logo or text logo
-  if (logoDataUrl) {
-    try { doc.addImage(logoDataUrl, 'PNG', 20, 10, 20, 20) } catch(e) {}
+  if (companySettings.logo_url) {
+    try { doc.addImage(companySettings.logo_url, 'PNG', 20, 10, 20, 20) } catch(e) {}
     doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.setTextColor(212, 241, 80)
-    doc.text('InvoiceFlow', 44, 22)
+    doc.text(companySettings.name || 'InvoiceFlow', 44, 22)
   } else {
     doc.setFont('helvetica', 'bold'); doc.setFontSize(22); doc.setTextColor(212, 241, 80)
-    doc.text('InvoiceFlow', 20, 22)
+    doc.text(companySettings.name || 'InvoiceFlow', 20, 22)
   }
 
   doc.setFontSize(11); doc.setTextColor(107, 107, 114)
@@ -974,7 +1126,10 @@ function downloadPDF() {
   doc.setFontSize(8); doc.setTextColor(107,107,114); doc.setFont('helvetica','normal')
   doc.text('FROM', 20, 48); doc.text('BILL TO', 110, 48)
   doc.setFontSize(11); doc.setTextColor(240,240,238); doc.setFont('helvetica','bold')
-  doc.text(currentUser.email || '—', 20, 56)
+  doc.text(companySettings.name || currentUser.email || '—', 20, 56)
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(107,107,114)
+  if (companySettings.email) doc.text(companySettings.email, 20, 62)
+  if (companySettings.address) doc.text(companySettings.address, 20, 68)
   doc.text(inv.clients?.name || '—', 110, 56)
   doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(107,107,114)
   if (inv.clients?.email) doc.text(inv.clients.email, 110, 62)
