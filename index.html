@@ -1093,110 +1093,269 @@ function downloadPDF() {
   const { jsPDF } = window.jspdf
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
   const inv = detailInvoice
-  const pageW = 210
+  const W = 210, margin = 20
+  const col2 = 110  // right column x
 
-  doc.setFillColor(14, 14, 15)
-  doc.rect(0, 0, pageW, 297, 'F')
-  doc.setFillColor(212, 241, 80)
-  doc.rect(0, 0, pageW, 2, 'F')
+  // ── Helpers
+  const fmt = d => d ? new Date(d+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—'
+  const money = n => '$' + Number(n).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2})
+  const gray1 = [30,30,30]       // near-black — headings
+  const gray2 = [80,80,80]       // dark gray — body text
+  const gray3 = [140,140,140]    // mid gray — labels
+  const gray4 = [210,210,210]    // light gray — lines / borders
+  const gray5 = [248,248,248]    // near-white — table row alt bg
+  const accentDark = [15,15,15]  // for accent text-on-fill
+  const accent = [30,30,30]      // header bar fill
 
-  // Logo or text logo
+  // ── White background
+  doc.setFillColor(255,255,255)
+  doc.rect(0, 0, W, 297, 'F')
+
+  // ── Top header bar (dark)
+  doc.setFillColor(...accent)
+  doc.rect(0, 0, W, 42, 'F')
+
+  // ── Logo in header
+  let logoEndX = margin
   if (companySettings.logo_url) {
-    try { doc.addImage(companySettings.logo_url, 'PNG', 20, 10, 20, 20) } catch(e) {}
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.setTextColor(212, 241, 80)
-    doc.text(companySettings.name || 'InvoiceFlow', 44, 22)
-  } else {
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(22); doc.setTextColor(212, 241, 80)
-    doc.text(companySettings.name || 'InvoiceFlow', 20, 22)
+    try {
+      doc.addImage(companySettings.logo_url, 'PNG', margin, 8, 22, 22)
+      logoEndX = margin + 26
+    } catch(e) { logoEndX = margin }
   }
 
-  doc.setFontSize(11); doc.setTextColor(107, 107, 114)
-  doc.text(inv.invoice_number || '#INV', 20, 32)
+  // Company name in header
+  doc.setFont('helvetica','bold')
+  doc.setFontSize(16)
+  doc.setTextColor(255,255,255)
+  doc.text(companySettings.name || 'Your Company', logoEndX, 20)
 
-  const statusColors = { paid:[62,207,142], sent:[124,106,247], overdue:[249,112,102], draft:[107,107,114], estimate:[107,107,114] }
-  const sc = statusColors[inv.status] || [107,107,114]
-  doc.setFillColor(...sc)
-  doc.roundedRect(pageW - 50, 24, 30, 8, 2, 2, 'F')
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(14, 14, 15)
-  doc.text(inv.status.toUpperCase(), pageW - 35, 29.5, { align: 'center' })
+  if (companySettings.email || companySettings.website) {
+    doc.setFont('helvetica','normal')
+    doc.setFontSize(8)
+    doc.setTextColor(180,180,180)
+    const sub = [companySettings.email, companySettings.website].filter(Boolean).join('  ·  ')
+    doc.text(sub, logoEndX, 27)
+  }
 
-  doc.setDrawColor(42, 42, 46); doc.setLineWidth(0.3)
-  doc.line(20, 38, pageW - 20, 38)
+  // INVOICE label (right side of header)
+  doc.setFont('helvetica','bold')
+  doc.setFontSize(22)
+  doc.setTextColor(255,255,255)
+  const docType = inv.status === 'estimate' ? 'ESTIMATE' : 'INVOICE'
+  doc.text(docType, W - margin, 18, { align:'right' })
+  doc.setFont('helvetica','normal')
+  doc.setFontSize(9)
+  doc.setTextColor(180,180,180)
+  doc.text(inv.invoice_number || '#INV-0001', W - margin, 26, { align:'right' })
 
-  doc.setFontSize(8); doc.setTextColor(107,107,114); doc.setFont('helvetica','normal')
-  doc.text('FROM', 20, 48); doc.text('BILL TO', 110, 48)
-  doc.setFontSize(11); doc.setTextColor(240,240,238); doc.setFont('helvetica','bold')
-  doc.text(companySettings.name || currentUser.email || '—', 20, 56)
-  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(107,107,114)
-  if (companySettings.email) doc.text(companySettings.email, 20, 62)
-  if (companySettings.address) doc.text(companySettings.address, 20, 68)
-  doc.text(inv.clients?.name || '—', 110, 56)
-  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(107,107,114)
-  if (inv.clients?.email) doc.text(inv.clients.email, 110, 62)
-  if (inv.clients?.address) doc.text(inv.clients.address, 110, 68)
+  // Status pill in header
+  const statusMap = {
+    paid:     { bg:[52,199,89],  label:'PAID' },
+    sent:     { bg:[0,122,255],  label:'SENT' },
+    overdue:  { bg:[255,59,48],  label:'OVERDUE' },
+    draft:    { bg:[142,142,147],label:'DRAFT' },
+    estimate: { bg:[88,86,214],  label:'ESTIMATE' },
+  }
+  const st = statusMap[inv.status] || statusMap.draft
+  doc.setFillColor(...st.bg)
+  doc.roundedRect(W - margin - 28, 30, 28, 7, 1.5, 1.5, 'F')
+  doc.setFont('helvetica','bold')
+  doc.setFontSize(7)
+  doc.setTextColor(255,255,255)
+  doc.text(st.label, W - margin - 14, 34.8, { align:'center' })
 
-  doc.line(20, 78, pageW - 20, 78)
-  const metaY = 86
-  const fmt = d => d ? new Date(d+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—'
-  const metaItems = [['ISSUE DATE', fmt(inv.issue_date)], ['DUE DATE', fmt(inv.due_date)], ['PAYMENT', inv.payment_method||'—'], ['NOTES', inv.notes||'—']]
-  metaItems.forEach(([label, value], i) => {
-    const x = 20 + (i * 45)
-    doc.setFontSize(7); doc.setTextColor(107,107,114); doc.setFont('helvetica','normal')
-    doc.text(label, x, metaY)
-    doc.setFontSize(9); doc.setTextColor(240,240,238); doc.setFont('helvetica','bold')
-    doc.text(String(value).substring(0,20), x, metaY + 6)
+  // ── FROM / BILL TO section
+  let y = 56
+
+  // Labels
+  doc.setFont('helvetica','bold')
+  doc.setFontSize(7)
+  doc.setTextColor(...gray3)
+  doc.text('FROM', margin, y)
+  doc.text('BILL TO', col2, y)
+
+  y += 6
+
+  // From — company
+  doc.setFont('helvetica','bold')
+  doc.setFontSize(11)
+  doc.setTextColor(...gray1)
+  doc.text(companySettings.name || currentUser.email || '—', margin, y)
+
+  // To — client
+  doc.text(inv.clients?.name || '—', col2, y)
+
+  y += 5
+  doc.setFont('helvetica','normal')
+  doc.setFontSize(8.5)
+  doc.setTextColor(...gray2)
+
+  const fromLines = [companySettings.email, companySettings.phone, companySettings.address].filter(Boolean)
+  fromLines.forEach(line => { doc.text(line, margin, y); y += 4.5 })
+
+  // Reset y for client column
+  let yClient = 62 + 5
+  doc.setFont('helvetica','normal')
+  doc.setFontSize(8.5)
+  doc.setTextColor(...gray2)
+  const toLines = [inv.clients?.email, inv.clients?.address].filter(Boolean)
+  toLines.forEach(line => { doc.text(line, col2, yClient); yClient += 4.5 })
+
+  // ── Divider
+  y = Math.max(y, yClient) + 6
+  doc.setDrawColor(...gray4)
+  doc.setLineWidth(0.3)
+  doc.line(margin, y, W - margin, y)
+  y += 8
+
+  // ── Invoice meta row (4 columns)
+  const metaCols = [
+    ['Issue Date',      fmt(inv.issue_date)],
+    ['Due Date',        fmt(inv.due_date)],
+    ['Payment Method',  inv.payment_method || '—'],
+    ['Notes',           (inv.notes || '—').substring(0, 28)],
+  ]
+  const colW = (W - margin * 2) / 4
+  metaCols.forEach(([label, value], i) => {
+    const x = margin + i * colW
+    doc.setFont('helvetica','normal')
+    doc.setFontSize(7)
+    doc.setTextColor(...gray3)
+    doc.text(label.toUpperCase(), x, y)
+    doc.setFont('helvetica','bold')
+    doc.setFontSize(9)
+    doc.setTextColor(...gray1)
+    doc.text(value, x, y + 5)
   })
-  doc.line(20, metaY + 12, pageW - 20, metaY + 12)
+  y += 14
 
+  // ── Thin divider before table
+  doc.setDrawColor(...gray4)
+  doc.setLineWidth(0.2)
+  doc.line(margin, y, W - margin, y)
+  y += 1
+
+  // ── Line items table
   const lineRows = (inv.line_items || []).map(l => [
-    l.description || '', String(l.quantity),
-    '$' + Number(l.rate).toLocaleString(),
-    '$' + (l.quantity * l.rate).toLocaleString()
+    l.description || '—',
+    { content: String(l.quantity), styles: { halign: 'center' } },
+    { content: money(l.rate), styles: { halign: 'right' } },
+    { content: money(l.quantity * l.rate), styles: { halign: 'right', fontStyle: 'bold', textColor: gray1 } },
   ])
 
   doc.autoTable({
-    startY: metaY + 18,
-    head: [['DESCRIPTION', 'QTY', 'RATE', 'TOTAL']],
+    startY: y,
+    head: [['Description', 'Qty', 'Rate', 'Amount']],
     body: lineRows,
     theme: 'plain',
-    margin: { left: 20, right: 20 },
-    styles: { font:'helvetica', fontSize:9, textColor:[240,240,238], fillColor:[22,22,24], cellPadding:4 },
-    headStyles: { fontSize:7, textColor:[107,107,114], fillColor:[14,14,15], fontStyle:'normal' },
-    alternateRowStyles: { fillColor:[30,30,33] },
-    columnStyles: { 0:{cellWidth:90}, 1:{cellWidth:20,halign:'center'}, 2:{cellWidth:35,halign:'right'}, 3:{cellWidth:35,halign:'right'} },
+    margin: { left: margin, right: margin },
+    styles: {
+      font: 'helvetica',
+      fontSize: 9,
+      textColor: gray2,
+      cellPadding: { top: 4, bottom: 4, left: 3, right: 3 },
+    },
+    headStyles: {
+      fontSize: 7.5,
+      fontStyle: 'bold',
+      textColor: gray3,
+      fillColor: [255,255,255],
+      lineWidth: { bottom: 0.3 },
+      lineColor: gray4,
+    },
+    alternateRowStyles: { fillColor: gray5 },
+    columnStyles: {
+      0: { cellWidth: 'auto' },
+      1: { cellWidth: 18, halign: 'center' },
+      2: { cellWidth: 32, halign: 'right' },
+      3: { cellWidth: 32, halign: 'right' },
+    },
+    didDrawPage: () => {
+      doc.setFillColor(255,255,255)
+      doc.rect(0,0,W,297,'F')
+    }
   })
 
-  // Totals with tax
+  // ── Totals block
   const subtotal = (inv.line_items||[]).reduce((s,l) => s+(l.quantity*l.rate), 0)
   const taxRate = inv.tax_rate || 0
   const taxAmt = subtotal * (taxRate / 100)
   const grandTotal = subtotal + taxAmt
 
-  const finalY = doc.lastAutoTable.finalY + 6
-  doc.setFillColor(30,30,33)
-  doc.roundedRect(pageW - 85, finalY, 65, taxRate > 0 ? 28 : 18, 3, 3, 'F')
+  let ty = doc.lastAutoTable.finalY + 6
+  const totalsX = W - margin - 70
+  const totalsW = 70
 
+  // Subtotal row
+  doc.setFont('helvetica','normal')
+  doc.setFontSize(9)
+  doc.setTextColor(...gray2)
+  doc.text('Subtotal', totalsX, ty)
+  doc.text(money(subtotal), W - margin, ty, { align:'right' })
+  ty += 6
+
+  // Tax row (only if applicable)
   if (taxRate > 0) {
-    doc.setFontSize(8); doc.setTextColor(107,107,114); doc.setFont('helvetica','normal')
-    doc.text('SUBTOTAL', pageW - 52, finalY + 6, { align:'center' })
-    doc.setFontSize(9); doc.setTextColor(240,240,238)
-    doc.text('$' + subtotal.toLocaleString(), pageW - 52, finalY + 11, { align:'center' })
-    doc.setFontSize(7); doc.setTextColor(107,107,114)
-    doc.text(`TAX (${taxRate}%)`, pageW - 52, finalY + 17, { align:'center' })
-    doc.setFontSize(8); doc.setTextColor(240,240,238)
-    doc.text('$' + taxAmt.toFixed(2), pageW - 52, finalY + 22, { align:'center' })
+    doc.text(`Tax (${taxRate}%)`, totalsX, ty)
+    doc.text(money(taxAmt), W - margin, ty, { align:'right' })
+    ty += 6
   }
 
-  const totalY = taxRate > 0 ? finalY + 34 : finalY + 6
-  doc.setFillColor(30,30,33)
-  doc.roundedRect(pageW - 85, totalY, 65, 18, 3, 3, 'F')
-  doc.setFontSize(8); doc.setTextColor(107,107,114); doc.setFont('helvetica','normal')
-  doc.text('TOTAL DUE', pageW - 52, totalY + 7, { align:'center' })
-  doc.setFontSize(16); doc.setTextColor(212,241,80); doc.setFont('helvetica','bold')
-  doc.text('$' + grandTotal.toLocaleString(), pageW - 52, totalY + 14, { align:'center' })
+  // Divider above total
+  doc.setDrawColor(...gray4)
+  doc.setLineWidth(0.3)
+  doc.line(totalsX, ty, W - margin, ty)
+  ty += 6
 
-  doc.setFontSize(8); doc.setTextColor(42,42,46); doc.setFont('helvetica','normal')
-  doc.text('Generated by InvoiceFlow · invoiceflow-psi.vercel.app', pageW / 2, 285, { align:'center' })
+  // Total due — prominent
+  doc.setFillColor(...accent)
+  doc.roundedRect(totalsX - 4, ty - 5, totalsW + 4, 13, 2, 2, 'F')
+  doc.setFont('helvetica','bold')
+  doc.setFontSize(9)
+  doc.setTextColor(180,180,180)
+  doc.text('TOTAL DUE', totalsX + 1, ty + 1)
+  doc.setFontSize(13)
+  doc.setTextColor(255,255,255)
+  doc.text(money(grandTotal), W - margin - 2, ty + 1, { align:'right' })
+
+  ty += 20
+
+  // ── Payment details box (if present)
+  if (companySettings.payment_details) {
+    doc.setFillColor(...gray5)
+    doc.roundedRect(margin, ty, W - margin*2, 16, 2, 2, 'F')
+    doc.setFont('helvetica','bold')
+    doc.setFontSize(7)
+    doc.setTextColor(...gray3)
+    doc.text('PAYMENT DETAILS', margin + 4, ty + 5)
+    doc.setFont('helvetica','normal')
+    doc.setFontSize(8.5)
+    doc.setTextColor(...gray2)
+    doc.text(companySettings.payment_details, margin + 4, ty + 11)
+    ty += 22
+  }
+
+  // ── Thank you note
+  if (inv.notes) {
+    doc.setFont('helvetica','italic')
+    doc.setFontSize(8.5)
+    doc.setTextColor(...gray3)
+    doc.text(inv.notes, margin, ty)
+    ty += 8
+  }
+
+  // ── Footer
+  doc.setDrawColor(...gray4)
+  doc.setLineWidth(0.2)
+  doc.line(margin, 282, W - margin, 282)
+  doc.setFont('helvetica','normal')
+  doc.setFontSize(7.5)
+  doc.setTextColor(...gray3)
+  doc.text(companySettings.name || 'InvoiceFlow', margin, 287)
+  if (companySettings.website) doc.text(companySettings.website, margin, 291)
+  doc.text('Generated by InvoiceFlow', W - margin, 287, { align:'right' })
+  doc.text('invoiceflow-psi.vercel.app', W - margin, 291, { align:'right' })
 
   doc.save((inv.invoice_number || 'invoice') + '.pdf')
   showToast('📄 PDF downloaded!')
