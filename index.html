@@ -1093,271 +1093,196 @@ function downloadPDF() {
   const { jsPDF } = window.jspdf
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
   const inv = detailInvoice
-  const W = 210, margin = 20
-  const col2 = 110  // right column x
+  const W = 210, L = 14, R = W - 14
 
-  // ── Helpers
+  // Helpers
   const fmt = d => d ? new Date(d+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—'
-  const money = n => '$' + Number(n).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2})
-  const gray1 = [30,30,30]       // near-black — headings
-  const gray2 = [80,80,80]       // dark gray — body text
-  const gray3 = [140,140,140]    // mid gray — labels
-  const gray4 = [210,210,210]    // light gray — lines / borders
-  const gray5 = [248,248,248]    // near-white — table row alt bg
-  const accentDark = [15,15,15]  // for accent text-on-fill
-  const accent = [30,30,30]      // header bar fill
+  const money = n => '$' + Number(n).toLocaleString('en',{minimumFractionDigits:2})
+
+  // Color palette
+  const BLACK  = [20,20,20]
+  const DARK   = [60,60,60]
+  const MID    = [120,120,120]
+  const LIGHT  = [190,190,190]
+  const XLIGHT = [240,240,240]
+  const WHITE  = [255,255,255]
+  const HEADER = [22,22,24]
 
   // ── White background
   doc.setFillColor(255,255,255)
-  doc.rect(0, 0, W, 297, 'F')
+  doc.rect(0,0,W,297,'F')
 
-  // ── Top header bar (dark)
-  doc.setFillColor(...accent)
-  doc.rect(0, 0, W, 42, 'F')
+  // ── Header bar — fixed height 38mm
+  doc.setFillColor(...HEADER)
+  doc.rect(0,0,W,38,'F')
 
-  // ── Logo in header
-  let logoEndX = margin
+  // Logo (if present)
+  let nameX = L
   if (companySettings.logo_url) {
-    try {
-      doc.addImage(companySettings.logo_url, 'PNG', margin, 8, 22, 22)
-      logoEndX = margin + 26
-    } catch(e) { logoEndX = margin }
+    try { doc.addImage(companySettings.logo_url,'PNG',L,7,18,18); nameX = L+22 } catch(e){}
   }
 
-  // Company name in header
-  doc.setFont('helvetica','bold')
-  doc.setFontSize(16)
-  doc.setTextColor(255,255,255)
-  doc.text(companySettings.name || 'Your Company', logoEndX, 20)
-
-  if (companySettings.email || companySettings.website) {
-    doc.setFont('helvetica','normal')
-    doc.setFontSize(8)
-    doc.setTextColor(180,180,180)
-    const sub = [companySettings.email, companySettings.website].filter(Boolean).join('  ·  ')
-    doc.text(sub, logoEndX, 27)
+  // Company name + email in header
+  doc.setFont('helvetica','bold').setFontSize(13).setTextColor(...WHITE)
+  doc.text(companySettings.name || 'Your Company', nameX, 17)
+  if (companySettings.email) {
+    doc.setFont('helvetica','normal').setFontSize(7.5).setTextColor(...LIGHT)
+    doc.text(companySettings.email, nameX, 23)
   }
 
-  // INVOICE label (right side of header)
-  doc.setFont('helvetica','bold')
-  doc.setFontSize(22)
-  doc.setTextColor(255,255,255)
-  const docType = inv.status === 'estimate' ? 'ESTIMATE' : 'INVOICE'
-  doc.text(docType, W - margin, 18, { align:'right' })
-  doc.setFont('helvetica','normal')
-  doc.setFontSize(9)
-  doc.setTextColor(180,180,180)
-  doc.text(inv.invoice_number || '#INV-0001', W - margin, 26, { align:'right' })
+  // INVOICE / ESTIMATE label right side
+  const docLabel = inv.status === 'estimate' ? 'ESTIMATE' : 'INVOICE'
+  doc.setFont('helvetica','bold').setFontSize(20).setTextColor(...WHITE)
+  doc.text(docLabel, R, 16, {align:'right'})
+  doc.setFont('helvetica','normal').setFontSize(8).setTextColor(...LIGHT)
+  doc.text(inv.invoice_number || '#INV-0001', R, 23, {align:'right'})
 
-  // Status pill in header
-  const statusMap = {
-    paid:     { bg:[52,199,89],  label:'PAID' },
-    sent:     { bg:[0,122,255],  label:'SENT' },
-    overdue:  { bg:[255,59,48],  label:'OVERDUE' },
-    draft:    { bg:[142,142,147],label:'DRAFT' },
-    estimate: { bg:[88,86,214],  label:'ESTIMATE' },
-  }
-  const st = statusMap[inv.status] || statusMap.draft
-  doc.setFillColor(...st.bg)
-  doc.roundedRect(W - margin - 28, 30, 28, 7, 1.5, 1.5, 'F')
-  doc.setFont('helvetica','bold')
-  doc.setFontSize(7)
-  doc.setTextColor(255,255,255)
-  doc.text(st.label, W - margin - 14, 34.8, { align:'center' })
+  // Status badge
+  const stMap = { paid:[52,199,89], sent:[0,122,255], overdue:[255,59,48], draft:[130,130,130], estimate:[88,86,214] }
+  const stColor = stMap[inv.status] || stMap.draft
+  doc.setFillColor(...stColor)
+  doc.roundedRect(R-26, 27, 26, 6.5, 1.5,1.5,'F')
+  doc.setFont('helvetica','bold').setFontSize(6.5).setTextColor(...WHITE)
+  doc.text((inv.status||'draft').toUpperCase(), R-13, 31.5, {align:'center'})
 
-  // ── FROM / BILL TO section
-  let y = 56
+  // ── FROM / BILL TO — fixed at y=46
+  doc.setFont('helvetica','bold').setFontSize(6.5).setTextColor(...MID)
+  doc.text('FROM', L, 46)
+  doc.text('BILL TO', 108, 46)
 
-  // Labels
-  doc.setFont('helvetica','bold')
-  doc.setFontSize(7)
-  doc.setTextColor(...gray3)
-  doc.text('FROM', margin, y)
-  doc.text('BILL TO', col2, y)
+  doc.setFont('helvetica','bold').setFontSize(10).setTextColor(...BLACK)
+  doc.text(companySettings.name || currentUser.email || '—', L, 52)
+  doc.text(inv.clients?.name || '—', 108, 52)
 
-  y += 6
+  doc.setFont('helvetica','normal').setFontSize(8).setTextColor(...DARK)
+  let fy = 57
+  if (companySettings.email)   { doc.text(companySettings.email,   L,   fy); fy += 4.5 }
+  if (companySettings.phone)   { doc.text(companySettings.phone,   L,   fy); fy += 4.5 }
+  if (companySettings.address) { doc.text(companySettings.address, L,   fy) }
 
-  // From — company
-  doc.setFont('helvetica','bold')
-  doc.setFontSize(11)
-  doc.setTextColor(...gray1)
-  doc.text(companySettings.name || currentUser.email || '—', margin, y)
+  let ty = 57
+  if (inv.clients?.email)   { doc.text(inv.clients.email,   108, ty); ty += 4.5 }
+  if (inv.clients?.address) { doc.text(inv.clients.address, 108, ty) }
 
-  // To — client
-  doc.text(inv.clients?.name || '—', col2, y)
+  // ── Divider — fixed at y=76
+  doc.setDrawColor(...XLIGHT).setLineWidth(0.3)
+  doc.line(L, 76, R, 76)
 
-  y += 5
-  doc.setFont('helvetica','normal')
-  doc.setFontSize(8.5)
-  doc.setTextColor(...gray2)
-
-  const fromLines = [companySettings.email, companySettings.phone, companySettings.address].filter(Boolean)
-  fromLines.forEach(line => { doc.text(line, margin, y); y += 4.5 })
-
-  // Reset y for client column
-  let yClient = 62 + 5
-  doc.setFont('helvetica','normal')
-  doc.setFontSize(8.5)
-  doc.setTextColor(...gray2)
-  const toLines = [inv.clients?.email, inv.clients?.address].filter(Boolean)
-  toLines.forEach(line => { doc.text(line, col2, yClient); yClient += 4.5 })
-
-  // ── Divider
-  y = Math.max(y, yClient) + 6
-  doc.setDrawColor(...gray4)
-  doc.setLineWidth(0.3)
-  doc.line(margin, y, W - margin, y)
-  y += 8
-
-  // ── Invoice meta row (4 columns)
+  // ── Meta row — fixed at y=80
   const metaCols = [
-    ['Issue Date',      fmt(inv.issue_date)],
-    ['Due Date',        fmt(inv.due_date)],
-    ['Payment Method',  inv.payment_method || '—'],
-    ['Notes',           (inv.notes || '—').substring(0, 28)],
+    ['ISSUE DATE',  fmt(inv.issue_date)],
+    ['DUE DATE',    fmt(inv.due_date)],
+    ['PAYMENT',     (inv.payment_method||'—').substring(0,14)],
+    ['NOTES',       (inv.notes||'—').substring(0,22)],
   ]
-  const colW = (W - margin * 2) / 4
-  metaCols.forEach(([label, value], i) => {
-    const x = margin + i * colW
-    doc.setFont('helvetica','normal')
-    doc.setFontSize(7)
-    doc.setTextColor(...gray3)
-    doc.text(label.toUpperCase(), x, y)
-    doc.setFont('helvetica','bold')
-    doc.setFontSize(9)
-    doc.setTextColor(...gray1)
-    doc.text(value, x, y + 5)
+  const cw = (R - L) / 4
+  metaCols.forEach(([label,value],i) => {
+    const x = L + i * cw
+    doc.setFont('helvetica','normal').setFontSize(6.5).setTextColor(...MID)
+    doc.text(label, x, 82)
+    doc.setFont('helvetica','bold').setFontSize(8.5).setTextColor(...BLACK)
+    doc.text(value, x, 88)
   })
-  y += 14
 
-  // ── Thin divider before table
-  doc.setDrawColor(...gray4)
-  doc.setLineWidth(0.2)
-  doc.line(margin, y, W - margin, y)
-  y += 1
+  // ── Divider — fixed at y=93
+  doc.setDrawColor(...XLIGHT).setLineWidth(0.2)
+  doc.line(L, 93, R, 93)
 
-  // ── Line items table
-  const lineRows = (inv.line_items || []).map(l => [
+  // ── Line items table — starts at y=95
+  const rows = (inv.line_items||[]).map(l => [
     l.description || '—',
-    { content: String(l.quantity), styles: { halign: 'center' } },
-    { content: money(l.rate), styles: { halign: 'right' } },
-    { content: money(l.quantity * l.rate), styles: { halign: 'right', fontStyle: 'bold', textColor: gray1 } },
+    {content: String(l.quantity), styles:{halign:'center'}},
+    {content: money(l.rate), styles:{halign:'right'}},
+    {content: money(l.quantity*l.rate), styles:{halign:'right', fontStyle:'bold', textColor:BLACK}},
   ])
 
   doc.autoTable({
-    startY: y,
-    head: [['Description', 'Qty', 'Rate', 'Amount']],
-    body: lineRows,
+    startY: 95,
+    head: [['Description','Qty','Rate','Amount']],
+    body: rows,
     theme: 'plain',
-    margin: { left: margin, right: margin },
+    margin: {left:L, right:14},
     styles: {
-      font: 'helvetica',
-      fontSize: 9,
-      textColor: gray2,
-      cellPadding: { top: 4, bottom: 4, left: 3, right: 3 },
+      font:'helvetica', fontSize:9,
+      textColor: DARK,
+      cellPadding: {top:3.5, bottom:3.5, left:2, right:2},
+      lineColor: XLIGHT,
     },
     headStyles: {
-      fontSize: 7.5,
-      fontStyle: 'bold',
-      textColor: gray3,
-      fillColor: [255,255,255],
-      lineWidth: { bottom: 0.3 },
-      lineColor: gray4,
+      fontSize:7, fontStyle:'bold',
+      textColor: MID,
+      fillColor: WHITE,
+      lineWidth: {bottom:0.25},
     },
-    alternateRowStyles: { fillColor: gray5 },
+    alternateRowStyles: { fillColor:[247,247,247] },
     columnStyles: {
-      0: { cellWidth: 'auto' },
-      1: { cellWidth: 18, halign: 'center' },
-      2: { cellWidth: 32, halign: 'right' },
-      3: { cellWidth: 32, halign: 'right' },
+      0: {cellWidth:'auto'},
+      1: {cellWidth:16, halign:'center'},
+      2: {cellWidth:30, halign:'right'},
+      3: {cellWidth:30, halign:'right'},
     },
-    didDrawPage: () => {
-      doc.setFillColor(255,255,255)
-      doc.rect(0,0,W,297,'F')
-    }
   })
 
-  // ── Totals block
-  const subtotal = (inv.line_items||[]).reduce((s,l) => s+(l.quantity*l.rate), 0)
-  const taxRate = inv.tax_rate || 0
-  const taxAmt = subtotal * (taxRate / 100)
-  const grandTotal = subtotal + taxAmt
+  // ── Totals — right-aligned, just below table
+  const subtotal = (inv.line_items||[]).reduce((s,l)=>s+(l.quantity*l.rate),0)
+  const taxRate  = inv.tax_rate || 0
+  const taxAmt   = subtotal * (taxRate/100)
+  const grand    = subtotal + taxAmt
 
-  let ty = doc.lastAutoTable.finalY + 6
-  const totalsX = W - margin - 70
-  const totalsW = 70
+  let tableEnd = doc.lastAutoTable.finalY + 5
+  const tX = R - 62  // left edge of totals block
 
-  // Subtotal row
-  doc.setFont('helvetica','normal')
-  doc.setFontSize(9)
-  doc.setTextColor(...gray2)
-  doc.text('Subtotal', totalsX, ty)
-  doc.text(money(subtotal), W - margin, ty, { align:'right' })
-  ty += 6
+  doc.setFont('helvetica','normal').setFontSize(8.5).setTextColor(...DARK)
+  doc.text('Subtotal', tX, tableEnd)
+  doc.text(money(subtotal), R, tableEnd, {align:'right'})
+  tableEnd += 6
 
-  // Tax row (only if applicable)
   if (taxRate > 0) {
-    doc.text(`Tax (${taxRate}%)`, totalsX, ty)
-    doc.text(money(taxAmt), W - margin, ty, { align:'right' })
-    ty += 6
+    doc.text(`Tax (${taxRate}%)`, tX, tableEnd)
+    doc.text(money(taxAmt), R, tableEnd, {align:'right'})
+    tableEnd += 6
   }
 
-  // Divider above total
-  doc.setDrawColor(...gray4)
-  doc.setLineWidth(0.3)
-  doc.line(totalsX, ty, W - margin, ty)
-  ty += 6
+  doc.setDrawColor(...LIGHT).setLineWidth(0.25)
+  doc.line(tX, tableEnd, R, tableEnd)
+  tableEnd += 5
 
-  // Total due — prominent
-  doc.setFillColor(...accent)
-  doc.roundedRect(totalsX - 4, ty - 5, totalsW + 4, 13, 2, 2, 'F')
-  doc.setFont('helvetica','bold')
-  doc.setFontSize(9)
-  doc.setTextColor(180,180,180)
-  doc.text('TOTAL DUE', totalsX + 1, ty + 1)
-  doc.setFontSize(13)
-  doc.setTextColor(255,255,255)
-  doc.text(money(grandTotal), W - margin - 2, ty + 1, { align:'right' })
+  // Total due box
+  doc.setFillColor(...HEADER)
+  doc.roundedRect(tX-2, tableEnd-4, R-tX+2, 11, 2,2,'F')
+  doc.setFont('helvetica','bold').setFontSize(7.5).setTextColor(...LIGHT)
+  doc.text('TOTAL DUE', tX+1, tableEnd+1)
+  doc.setFontSize(12).setTextColor(...WHITE)
+  doc.text(money(grand), R-2, tableEnd+1, {align:'right'})
+  tableEnd += 14
 
-  ty += 20
-
-  // ── Payment details box (if present)
+  // ── Payment details (if any)
   if (companySettings.payment_details) {
-    doc.setFillColor(...gray5)
-    doc.roundedRect(margin, ty, W - margin*2, 16, 2, 2, 'F')
-    doc.setFont('helvetica','bold')
-    doc.setFontSize(7)
-    doc.setTextColor(...gray3)
-    doc.text('PAYMENT DETAILS', margin + 4, ty + 5)
-    doc.setFont('helvetica','normal')
-    doc.setFontSize(8.5)
-    doc.setTextColor(...gray2)
-    doc.text(companySettings.payment_details, margin + 4, ty + 11)
-    ty += 22
+    doc.setFillColor(...XLIGHT)
+    doc.roundedRect(L, tableEnd, R-L, 14, 2,2,'F')
+    doc.setFont('helvetica','bold').setFontSize(6.5).setTextColor(...MID)
+    doc.text('PAYMENT DETAILS', L+3, tableEnd+5)
+    doc.setFont('helvetica','normal').setFontSize(8.5).setTextColor(...DARK)
+    doc.text(companySettings.payment_details, L+3, tableEnd+11)
+    tableEnd += 18
   }
 
   // ── Thank you note
   if (inv.notes) {
-    doc.setFont('helvetica','italic')
-    doc.setFontSize(8.5)
-    doc.setTextColor(...gray3)
-    doc.text(inv.notes, margin, ty)
-    ty += 8
+    doc.setFont('helvetica','italic').setFontSize(8).setTextColor(...MID)
+    doc.text(inv.notes, L, tableEnd)
   }
 
-  // ── Footer
-  doc.setDrawColor(...gray4)
-  doc.setLineWidth(0.2)
-  doc.line(margin, 282, W - margin, 282)
-  doc.setFont('helvetica','normal')
-  doc.setFontSize(7.5)
-  doc.setTextColor(...gray3)
-  doc.text(companySettings.name || 'InvoiceFlow', margin, 287)
-  if (companySettings.website) doc.text(companySettings.website, margin, 291)
-  doc.text('Generated by InvoiceFlow', W - margin, 287, { align:'right' })
-  doc.text('invoiceflow-psi.vercel.app', W - margin, 291, { align:'right' })
+  // ── Footer — fixed at bottom
+  doc.setDrawColor(...XLIGHT).setLineWidth(0.2)
+  doc.line(L, 283, R, 283)
+  doc.setFont('helvetica','normal').setFontSize(7).setTextColor(...MID)
+  doc.text(companySettings.name || 'InvoiceFlow', L, 288)
+  if (companySettings.website) doc.text(companySettings.website, L, 292)
+  doc.text('Generated by InvoiceFlow', R, 288, {align:'right'})
+  doc.text('invoiceflow-psi.vercel.app', R, 292, {align:'right'})
 
-  doc.save((inv.invoice_number || 'invoice') + '.pdf')
+  doc.save((inv.invoice_number||'invoice')+'.pdf')
   showToast('📄 PDF downloaded!')
 }
 
