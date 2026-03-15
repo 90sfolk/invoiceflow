@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>InvoiceFlow — Simple Invoicing for Freelancers</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+
+<!-- ✅ STEP 5: Paste your Supabase keys here -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  const SUPABASE_URL = 'https://qlejmmsizedjpfwicvux.supabase.co'  // ← replace this
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFsZWptbXNpemVkanBmd2ljdnV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NTgwMjksImV4cCI6MjA4OTEzNDAyOX0.oq34AdYu4NknnfqPH8v4bfA4Kg9KngEJ089hecFGoRc'                             // ← replace this
+  const { createClient } = supabase
+  const db = createClient(SUPABASE_URL, SUPABASE_KEY)
+</script>
+
+<style>
+  :root {
+    --bg: #0e0e0f;
+    --surface: #161618;
+    --surface2: #1e1e21;
+    --border: #2a2a2e;
+    --accent: #d4f150;
+    --accent2: #7c6af7;
+    --text: #f0f0ee;
+    --muted: #6b6b72;
+    --paid: #3ecf8e;
+    --overdue: #f97066;
+    --pending: #f5a623;
+    --radius: 12px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'DM Mono',monospace; background:var(--bg); color:var(--text); min-height:100vh; display:flex; overflow-x:hidden; }
+
+  /* AUTH SCREEN */
+  .auth-screen { position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:999; }
+  .auth-screen.hidden { display:none; }
+  .auth-box { background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:40px;width:380px; }
+  .auth-logo { font-family:'Syne',sans-serif;font-weight:800;font-size:24px;color:var(--accent);margin-bottom:8px;display:flex;align-items:center;gap:8px; }
+  .auth-logo-icon { width:32px;height:32px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px; }
+  .auth-sub { color:var(--muted);font-size:13px;margin-bottom:32px; }
+  .auth-tabs { display:flex;gap:4px;background:var(--surface2);border-radius:8px;padding:3px;margin-bottom:24px; }
+  .auth-tab { flex:1;padding:8px;text-align:center;border-radius:6px;font-size:13px;cursor:pointer;color:var(--muted);border:none;background:none;font-family:'DM Mono',monospace;transition:all .15s; }
+  .auth-tab.active { background:var(--surface);color:var(--text); }
+  .auth-label { display:block;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:8px; }
+  .auth-input { width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:11px 14px;color:var(--text);font-family:'DM Mono',monospace;font-size:13px;outline:none;margin-bottom:14px;transition:border-color .15s; }
+  .auth-input:focus { border-color:var(--accent); }
+  .auth-input::placeholder { color:var(--muted); }
+  .auth-btn { width:100%;padding:12px;background:var(--accent);color:#0e0e0f;border:none;border-radius:8px;font-family:'DM Mono',monospace;font-size:14px;font-weight:500;cursor:pointer;margin-top:4px;transition:background .15s; }
+  .auth-btn:hover { background:#c8e840; }
+  .auth-btn:disabled { opacity:.5;cursor:not-allowed; }
+  .auth-error { background:rgba(249,112,102,.12);border:1px solid var(--overdue);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--overdue);margin-bottom:14px;display:none; }
+  .auth-error.show { display:block; }
+
+  /* APP */
+  .app { display:none;width:100%; }
+  .app.visible { display:flex; }
+
+  /* SIDEBAR */
+  .sidebar { width:220px;min-height:100vh;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:28px 16px;position:fixed;left:0;top:0;bottom:0;z-index:100; }
+  .logo { font-family:'Syne',sans-serif;font-weight:800;font-size:20px;color:var(--accent);margin-bottom:40px;padding:0 8px;display:flex;align-items:center;gap:8px; }
+  .logo-icon { width:28px;height:28px;background:var(--accent);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px; }
+  .nav-section { font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);padding:0 8px;margin-bottom:8px;margin-top:20px; }
+  .nav-item { display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;cursor:pointer;font-size:13px;color:var(--muted);transition:all .15s;margin-bottom:2px;text-decoration:none; }
+  .nav-item:hover { background:var(--surface2);color:var(--text); }
+  .nav-item.active { background:var(--accent);color:#0e0e0f;font-weight:500; }
+  .nav-icon { font-size:15px; }
+  .sidebar-bottom { margin-top:auto;border-top:1px solid var(--border);padding-top:16px; }
+  .user-pill { display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;cursor:pointer; }
+  .user-pill:hover { background:var(--surface2); }
+  .avatar { width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--accent2),var(--accent));display:flex;align-items:center;justify-content:center;font-size:11px;font-family:'Syne',sans-serif;font-weight:700;color:white;flex-shrink:0; }
+  .user-info { font-size:12px;overflow:hidden; }
+  .user-name { color:var(--text);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+  .user-plan { color:var(--accent);font-size:10px; }
+
+  /* MAIN */
+  .main { margin-left:220px;flex:1;padding:36px 40px;min-height:100vh; }
+  .view { display:none; }
+  .view.active { display:block;animation:fadeIn .3s ease; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+  /* PAGE HEADER */
+  .page-header { display:flex;align-items:center;justify-content:space-between;margin-bottom:36px; }
+  .page-title { font-family:'Syne',sans-serif;font-size:28px;font-weight:800;letter-spacing:-.5px; }
+  .page-subtitle { color:var(--muted);font-size:13px;margin-top:4px; }
+
+  /* BUTTONS */
+  .btn { display:inline-flex;align-items:center;gap:8px;padding:10px 20px;border-radius:8px;font-family:'DM Mono',monospace;font-size:13px;font-weight:500;cursor:pointer;border:none;transition:all .15s; }
+  .btn-primary { background:var(--accent);color:#0e0e0f; }
+  .btn-primary:hover { background:#c8e840;transform:translateY(-1px); }
+  .btn-primary:disabled { opacity:.5;cursor:not-allowed;transform:none; }
+  .btn-ghost { background:transparent;color:var(--muted);border:1px solid var(--border); }
+  .btn-ghost:hover { border-color:var(--text);color:var(--text); }
+
+  /* STATS */
+  .stats-grid { display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:32px; }
+  .stat-card { background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:22px;position:relative;overflow:hidden;transition:transform .15s; }
+  .stat-card:hover { transform:translateY(-2px); }
+  .stat-card::before { content:'';position:absolute;top:0;left:0;right:0;height:2px; }
+  .stat-card.total::before { background:var(--accent2); }
+  .stat-card.paid::before { background:var(--paid); }
+  .stat-card.pending::before { background:var(--pending); }
+  .stat-card.overdue::before { background:var(--overdue); }
+  .stat-label { font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:12px; }
+  .stat-value { font-family:'Syne',sans-serif;font-size:28px;font-weight:800;letter-spacing:-1px; }
+  .stat-sub { font-size:11px;color:var(--muted);margin-top:6px; }
+  .stat-card.paid .stat-value { color:var(--paid); }
+  .stat-card.overdue .stat-value { color:var(--overdue); }
+  .stat-card.pending .stat-value { color:var(--pending); }
+
+  /* TABLE */
+  .table-section { background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden; }
+  .table-header { display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--border); }
+  .table-title { font-family:'Syne',sans-serif;font-weight:700;font-size:16px; }
+  .filter-tabs { display:flex;gap:4px;background:var(--surface2);border-radius:8px;padding:3px; }
+  .filter-tab { padding:6px 14px;border-radius:6px;font-size:12px;cursor:pointer;color:var(--muted);transition:all .15s;border:none;background:none;font-family:'DM Mono',monospace; }
+  .filter-tab.active { background:var(--surface);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.3); }
+  .invoice-table { width:100%;border-collapse:collapse; }
+  .invoice-table th { text-align:left;padding:12px 24px;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:1px solid var(--border);font-weight:400; }
+  .invoice-table td { padding:16px 24px;font-size:13px;border-bottom:1px solid var(--border);vertical-align:middle; }
+  .invoice-table tr:last-child td { border-bottom:none; }
+  .invoice-table tr:hover td { background:var(--surface2); }
+  .invoice-num { font-weight:500;color:var(--accent);font-size:12px; }
+  .client-name { font-weight:500; }
+  .client-email { font-size:11px;color:var(--muted);margin-top:2px; }
+  .amount { font-family:'Syne',sans-serif;font-weight:700;font-size:15px; }
+  .badge { display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:500; }
+  .badge::before { content:'';width:5px;height:5px;border-radius:50%;background:currentColor; }
+  .badge-paid { background:rgba(62,207,142,.12);color:var(--paid); }
+  .badge-overdue { background:rgba(249,112,102,.12);color:var(--overdue); }
+  .badge-pending { background:rgba(245,166,35,.12);color:var(--pending); }
+  .badge-sent { background:rgba(124,106,247,.12);color:var(--accent2); }
+  .badge-draft { background:rgba(107,107,114,.15);color:var(--muted); }
+  .action-btns { display:flex;gap:6px; }
+  .icon-btn { width:30px;height:30px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;transition:all .15s; }
+  .icon-btn:hover { border-color:var(--text);color:var(--text);background:var(--surface2); }
+
+  /* FORM */
+  .form-grid { display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px; }
+  .form-card { background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:28px; }
+  .form-card-title { font-family:'Syne',sans-serif;font-weight:700;font-size:15px;margin-bottom:20px;display:flex;align-items:center;gap:8px; }
+  .form-card-title span { width:24px;height:24px;background:var(--accent);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;color:#0e0e0f; }
+  .form-group { margin-bottom:16px; }
+  .form-label { display:block;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:8px; }
+  .form-input { width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--text);font-family:'DM Mono',monospace;font-size:13px;transition:border-color .15s;outline:none; }
+  .form-input:focus { border-color:var(--accent); }
+  .form-input::placeholder { color:var(--muted); }
+
+  /* LINE ITEMS */
+  .line-items-card { background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:28px;margin-bottom:24px; }
+  .line-item-row { display:grid;grid-template-columns:1fr 80px 100px 100px 36px;gap:10px;align-items:center;margin-bottom:10px; }
+  .line-item-header { display:grid;grid-template-columns:1fr 80px 100px 100px 36px;gap:10px;margin-bottom:12px; }
+  .line-item-header span { font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted); }
+  .totals-row { display:flex;justify-content:flex-end;margin-top:20px;padding-top:20px;border-top:1px solid var(--border); }
+  .totals-box { width:260px; }
+  .totals-line { display:flex;justify-content:space-between;font-size:13px;padding:6px 0;color:var(--muted); }
+  .totals-line.total { font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:var(--text);border-top:1px solid var(--border);padding-top:12px;margin-top:6px; }
+  .form-actions { display:flex;gap:12px;justify-content:flex-end; }
+
+  /* MODAL */
+  .modal-overlay { position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);z-index:200;display:none;align-items:center;justify-content:center; }
+  .modal-overlay.open { display:flex; }
+  .modal { background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:32px;width:420px;animation:slideUp .25s ease; }
+  @keyframes slideUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+  .modal-title { font-family:'Syne',sans-serif;font-weight:800;font-size:20px;margin-bottom:8px; }
+  .modal-sub { color:var(--muted);font-size:13px;margin-bottom:24px; }
+  .reminder-preview { background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:16px;font-size:12px;line-height:1.7;color:var(--muted);margin-bottom:20px; }
+  .reminder-preview strong { color:var(--text); }
+  .modal-actions { display:flex;gap:10px;justify-content:flex-end; }
+
+  /* TOAST */
+  .toast { position:fixed;bottom:28px;right:28px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px 20px;font-size:13px;display:flex;align-items:center;gap:10px;z-index:300;transform:translateY(80px);opacity:0;transition:all .3s ease; }
+  .toast.show { transform:translateY(0);opacity:1; }
+  .empty-state { text-align:center;padding:60px 20px;color:var(--muted); }
+  .loading-row td { text-align:center;color:var(--muted);font-size:13px;padding:40px; }
+  ::-webkit-scrollbar { width:4px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+  ::-webkit-scrollbar-thumb { background:var(--border);border-radius:4px; }
+</style>
+</head>
+<body>
+
+<!-- AUTH SCREEN -->
+<div class="auth-screen" id="auth-screen">
+  <div class="auth-box">
+    <div class="auth-logo"><div class="auth-logo-icon">⚡</div>InvoiceFlow</div>
+    <div class="auth-sub">Simple invoicing for freelancers</div>
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="switchAuthTab('login',this)">Sign In</button>
+      <button class="auth-tab" onclick="switchAuthTab('signup',this)">Create Account</button>
+    </div>
+    <div class="auth-error" id="auth-error"></div>
+    <div id="auth-login">
+      <label class="auth-label">Email</label>
+      <input class="auth-input" id="login-email" type="email" placeholder="you@example.com" />
+      <label class="auth-label">Password</label>
+      <input class="auth-input" id="login-password" type="password" placeholder="••••••••" />
+      <button class="auth-btn" onclick="handleLogin()">Sign In →</button>
+    </div>
+    <div id="auth-signup" style="display:none">
+      <label class="auth-label">Email</label>
+      <input class="auth-input" id="signup-email" type="email" placeholder="you@example.com" />
+      <label class="auth-label">Password</label>
+      <input class="auth-input" id="signup-password" type="password" placeholder="Min 6 characters" />
+      <button class="auth-btn" onclick="handleSignup()">Create Free Account →</button>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div class="app" id="app">
+  <aside class="sidebar">
+    <div class="logo"><div class="logo-icon">⚡</div>InvoiceFlow</div>
+    <div class="nav-section">Menu</div>
+    <a class="nav-item active" onclick="showView('dashboard',this)"><span class="nav-icon">▦</span> Dashboard</a>
+    <a class="nav-item" onclick="showView('invoices',this)"><span class="nav-icon">◫</span> Invoices</a>
+    <a class="nav-item" onclick="showView('create',this)"><span class="nav-icon">＋</span> New Invoice</a>
+    <div class="nav-section">Account</div>
+    <a class="nav-item" onclick="handleLogout()"><span class="nav-icon">←</span> Sign Out</a>
+    <div class="sidebar-bottom">
+      <div class="user-pill">
+        <div class="avatar" id="user-avatar">?</div>
+        <div class="user-info">
+          <div class="user-name" id="user-email-display">Loading...</div>
+          <div class="user-plan">✦ Free Trial</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+
+    <!-- DASHBOARD -->
+    <div class="view active" id="view-dashboard">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Dashboard</div>
+          <div class="page-subtitle" id="dash-subtitle">Loading...</div>
+        </div>
+        <button class="btn btn-primary" onclick="showView('create',document.querySelector('[onclick*=create]'))">＋ New Invoice</button>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card total"><div class="stat-label">Total Outstanding</div><div class="stat-value" id="stat-outstanding">$0</div><div class="stat-sub" id="stat-outstanding-sub">0 invoices</div></div>
+        <div class="stat-card paid"><div class="stat-label">Paid</div><div class="stat-value" id="stat-paid">$0</div><div class="stat-sub" id="stat-paid-sub">0 invoices</div></div>
+        <div class="stat-card pending"><div class="stat-label">Awaiting Payment</div><div class="stat-value" id="stat-pending">$0</div><div class="stat-sub" id="stat-pending-sub">0 sent</div></div>
+        <div class="stat-card overdue"><div class="stat-label">Overdue</div><div class="stat-value" id="stat-overdue">$0</div><div class="stat-sub" id="stat-overdue-sub">0 invoices</div></div>
+      </div>
+      <div class="table-section">
+        <div class="table-header"><div class="table-title">Recent Invoices</div></div>
+        <table class="invoice-table">
+          <thead><tr><th>Invoice</th><th>Client</th><th>Amount</th><th>Due Date</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody id="dashboard-table-body"><tr class="loading-row"><td colspan="6">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ALL INVOICES -->
+    <div class="view" id="view-invoices">
+      <div class="page-header">
+        <div><div class="page-title">All Invoices</div><div class="page-subtitle">Manage and track all your invoices</div></div>
+        <button class="btn btn-primary" onclick="showView('create',document.querySelector('[onclick*=create]'))">＋ New Invoice</button>
+      </div>
+      <div class="table-section">
+        <div class="table-header">
+          <div class="table-title">Invoice List</div>
+          <div class="filter-tabs">
+            <button class="filter-tab active" onclick="filterInvoices('all',this)">All</button>
+            <button class="filter-tab" onclick="filterInvoices('paid',this)">Paid</button>
+            <button class="filter-tab" onclick="filterInvoices('sent',this)">Sent</button>
+            <button class="filter-tab" onclick="filterInvoices('overdue',this)">Overdue</button>
+          </div>
+        </div>
+        <table class="invoice-table">
+          <thead><tr><th>Invoice</th><th>Client</th><th>Amount</th><th>Due Date</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody id="invoices-table-body"><tr class="loading-row"><td colspan="6">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- CREATE INVOICE -->
+    <div class="view" id="view-create">
+      <div class="page-header">
+        <div><div class="page-title">New Invoice</div><div class="page-subtitle" id="new-invoice-num">Draft</div></div>
+        <div style="display:flex;gap:10px;">
+          <button class="btn btn-ghost" onclick="showView('dashboard',document.querySelector('[onclick*=dashboard]'))">Cancel</button>
+          <button class="btn btn-ghost" id="btn-save-draft" onclick="saveInvoice('draft')">Save Draft</button>
+          <button class="btn btn-primary" id="btn-send" onclick="saveInvoice('sent')">✉ Send Invoice</button>
+        </div>
+      </div>
+
+      <div class="form-grid">
+        <div class="form-card">
+          <div class="form-card-title"><span>1</span> From (You)</div>
+          <div class="form-group"><label class="form-label">Your Name / Business</label><input class="form-input" id="from-name" placeholder="Alex Johnson" /></div>
+          <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="from-email" placeholder="you@email.com" /></div>
+          <div class="form-group"><label class="form-label">Address (optional)</label><input class="form-input" id="from-address" placeholder="123 Main St" /></div>
+        </div>
+        <div class="form-card">
+          <div class="form-card-title"><span>2</span> Bill To (Client)</div>
+          <div class="form-group"><label class="form-label">Client Name / Company</label><input class="form-input" id="client-name" placeholder="Acme Corp" /></div>
+          <div class="form-group"><label class="form-label">Client Email</label><input class="form-input" id="client-email" placeholder="billing@client.com" /></div>
+          <div class="form-group"><label class="form-label">Client Address (optional)</label><input class="form-input" id="client-address" placeholder="456 Business Ave" /></div>
+        </div>
+      </div>
+
+      <div class="form-grid">
+        <div class="form-card">
+          <div class="form-card-title"><span>3</span> Invoice Details</div>
+          <div class="form-group"><label class="form-label">Invoice Number</label><input class="form-input" id="inv-number" placeholder="#INV-0001" /></div>
+          <div class="form-group"><label class="form-label">Issue Date</label><input class="form-input" type="date" id="inv-issue-date" /></div>
+          <div class="form-group"><label class="form-label">Due Date</label><input class="form-input" type="date" id="inv-due-date" /></div>
+        </div>
+        <div class="form-card">
+          <div class="form-card-title"><span>4</span> Payment & Notes</div>
+          <div class="form-group"><label class="form-label">Payment Method</label><select class="form-input" id="inv-payment-method"><option>Bank Transfer</option><option>PayPal</option><option>Stripe</option><option>Wise</option></select></div>
+          <div class="form-group"><label class="form-label">Payment Details</label><input class="form-input" id="inv-payment-details" placeholder="Account number or PayPal email" /></div>
+          <div class="form-group"><label class="form-label">Notes (optional)</label><input class="form-input" id="inv-notes" placeholder="Thank you for your business!" /></div>
+        </div>
+      </div>
+
+      <div class="line-items-card">
+        <div class="form-card-title"><span>5</span> Line Items</div>
+        <div class="line-item-header"><span>Description</span><span>Qty</span><span>Rate ($)</span><span>Total</span><span></span></div>
+        <div id="line-items"></div>
+        <button class="btn btn-ghost" style="margin-top:12px;font-size:12px;" onclick="addLine()">＋ Add Line Item</button>
+        <div class="totals-row">
+          <div class="totals-box">
+            <div class="totals-line"><span>Subtotal</span><span id="subtotal">$0.00</span></div>
+            <div class="totals-line"><span>Tax (0%)</span><span>$0.00</span></div>
+            <div class="totals-line total"><span>Total</span><span id="grand-total">$0.00</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button class="btn btn-ghost" onclick="showView('dashboard',document.querySelector('[onclick*=dashboard]'))">Cancel</button>
+        <button class="btn btn-ghost" onclick="saveInvoice('draft')">Save Draft</button>
+        <button class="btn btn-primary" onclick="saveInvoice('sent')">✉ Send Invoice</button>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- REMINDER MODAL -->
+<div class="modal-overlay" id="reminder-modal">
+  <div class="modal">
+    <div class="modal-title">Send Payment Reminder</div>
+    <div class="modal-sub" id="modal-sub">Sending reminder...</div>
+    <div class="reminder-preview">
+      Hi <strong id="rp-name">Client</strong>,<br><br>
+      This is a friendly reminder that invoice <strong id="rp-num">#INV</strong> for <strong id="rp-amount">$0</strong> is now due.<br><br>
+      Please let us know if you have any questions.<br><br>
+      Thank you for your continued business!<br>
+      — <span id="rp-from">You</span>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeReminder()">Cancel</button>
+      <button class="btn btn-primary" onclick="sendReminder()">📧 Send Reminder</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"><span id="toast-msg">Done!</span></div>
+
+<script>
+let currentUser = null
+let allInvoices = []
+
+// ── AUTH ──────────────────────────────────────────────────
+function switchAuthTab(tab, el) {
+  document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'))
+  el.classList.add('active')
+  document.getElementById('auth-login').style.display = tab === 'login' ? 'block' : 'none'
+  document.getElementById('auth-signup').style.display = tab === 'signup' ? 'block' : 'none'
+  document.getElementById('auth-error').classList.remove('show')
+}
+
+function showAuthError(msg) {
+  const el = document.getElementById('auth-error')
+  el.textContent = msg; el.classList.add('show')
+}
+
+async function handleLogin() {
+  const email = document.getElementById('login-email').value.trim()
+  const password = document.getElementById('login-password').value
+  if (!email || !password) return showAuthError('Please fill in all fields.')
+  const btn = document.querySelector('#auth-login .auth-btn')
+  btn.disabled = true; btn.textContent = 'Signing in...'
+  const { error } = await db.auth.signInWithPassword({ email, password })
+  btn.disabled = false; btn.textContent = 'Sign In →'
+  if (error) showAuthError(error.message)
+}
+
+async function handleSignup() {
+  const email = document.getElementById('signup-email').value.trim()
+  const password = document.getElementById('signup-password').value
+  if (!email || !password) return showAuthError('Please fill in all fields.')
+  if (password.length < 6) return showAuthError('Password must be at least 6 characters.')
+  const btn = document.querySelector('#auth-signup .auth-btn')
+  btn.disabled = true; btn.textContent = 'Creating account...'
+  const { error } = await db.auth.signUp({ email, password })
+  btn.disabled = false; btn.textContent = 'Create Free Account →'
+  if (error) showAuthError(error.message)
+  else showAuthError('✅ Check your email to confirm your account, then sign in.')
+}
+
+async function handleLogout() {
+  await db.auth.signOut()
+}
+
+// ── INIT ──────────────────────────────────────────────────
+db.auth.onAuthStateChange((event, session) => {
+  if (session?.user) {
+    currentUser = session.user
+    document.getElementById('auth-screen').classList.add('hidden')
+    document.getElementById('app').classList.add('visible')
+    const email = currentUser.email
+    document.getElementById('user-email-display').textContent = email
+    document.getElementById('user-avatar').textContent = email[0].toUpperCase()
+    loadInvoices()
+    setupCreateForm()
+  } else {
+    currentUser = null
+    document.getElementById('auth-screen').classList.remove('hidden')
+    document.getElementById('app').classList.remove('visible')
+  }
+})
+
+// ── NAVIGATION ────────────────────────────────────────────
+function showView(name, el) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'))
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'))
+  document.getElementById('view-' + name).classList.add('active')
+  if (el) el.classList.add('active')
+  if (name === 'create') setupCreateForm()
+  if (name === 'dashboard' || name === 'invoices') loadInvoices()
+}
+
+// ── LOAD INVOICES ─────────────────────────────────────────
+async function loadInvoices() {
+  const { data, error } = await db
+    .from('invoices')
+    .select('*, clients(name, email), line_items(quantity, rate)')
+    .order('created_at', { ascending: false })
+
+  if (error) { showToast('❌ Error loading invoices'); return }
+
+  allInvoices = (data || []).map(inv => ({
+    ...inv,
+    total: (inv.line_items || []).reduce((s, l) => s + (l.quantity * l.rate), 0)
+  }))
+
+  renderStats()
+  renderInvoiceTable('dashboard-table-body', allInvoices.slice(0, 5))
+  renderInvoiceTable('invoices-table-body', allInvoices)
+}
+
+function renderStats() {
+  const paid = allInvoices.filter(i => i.status === 'paid')
+  const pending = allInvoices.filter(i => i.status === 'sent')
+  const overdue = allInvoices.filter(i => i.status === 'overdue')
+  const outstanding = [...pending, ...overdue]
+  const sum = arr => arr.reduce((s, i) => s + i.total, 0)
+  const fmt = n => '$' + n.toLocaleString()
+  document.getElementById('stat-outstanding').textContent = fmt(sum(outstanding))
+  document.getElementById('stat-outstanding-sub').textContent = outstanding.length + ' invoices'
+  document.getElementById('stat-paid').textContent = fmt(sum(paid))
+  document.getElementById('stat-paid-sub').textContent = paid.length + ' invoices'
+  document.getElementById('stat-pending').textContent = fmt(sum(pending))
+  document.getElementById('stat-pending-sub').textContent = pending.length + ' invoices sent'
+  document.getElementById('stat-overdue').textContent = fmt(sum(overdue))
+  document.getElementById('stat-overdue-sub').textContent = overdue.length + ' overdue'
+  document.getElementById('dash-subtitle').textContent = allInvoices.length + ' total invoices'
+}
+
+function renderInvoiceTable(tbodyId, invoices) {
+  const tbody = document.getElementById(tbodyId)
+  if (!invoices.length) {
+    tbody.innerHTML = `<tr class="loading-row"><td colspan="6" style="text-align:center;padding:50px;color:var(--muted)">No invoices yet — create your first one!</td></tr>`
+    return
+  }
+  tbody.innerHTML = invoices.map(inv => `
+    <tr>
+      <td><div class="invoice-num">${inv.invoice_number || '#INV'}</div></td>
+      <td><div class="client-name">${inv.clients?.name || '—'}</div><div class="client-email">${inv.clients?.email || ''}</div></td>
+      <td><div class="amount">$${inv.total.toLocaleString()}</div></td>
+      <td>${inv.due_date ? new Date(inv.due_date + 'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—'}</td>
+      <td><span class="badge badge-${inv.status}">${inv.status}</span></td>
+      <td><div class="action-btns">
+        ${inv.status !== 'paid' ? `<button class="icon-btn" title="Remind" onclick="openReminder('${(inv.clients?.name||'').replace(/'/g,"\\'")}','${inv.invoice_number}','$${inv.total}')">🔔</button>` : ''}
+        ${inv.status !== 'paid' ? `<button class="icon-btn" title="Mark Paid" onclick="markPaid('${inv.id}')">✓</button>` : ''}
+        <button class="icon-btn" title="Delete" onclick="deleteInvoice('${inv.id}')">✕</button>
+      </div></td>
+    </tr>
+  `).join('')
+}
+
+function filterInvoices(filter, el) {
+  document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'))
+  el.classList.add('active')
+  const filtered = filter === 'all' ? allInvoices : allInvoices.filter(i => i.status === filter)
+  renderInvoiceTable('invoices-table-body', filtered)
+}
+
+// ── MARK PAID / DELETE ────────────────────────────────────
+async function markPaid(id) {
+  const { error } = await db.from('invoices').update({ status: 'paid' }).eq('id', id)
+  if (error) showToast('❌ Error'); else { showToast('✅ Marked as paid!'); loadInvoices() }
+}
+
+async function deleteInvoice(id) {
+  if (!confirm('Delete this invoice?')) return
+  await db.from('line_items').delete().eq('invoice_id', id)
+  const { error } = await db.from('invoices').delete().eq('id', id)
+  if (error) showToast('❌ Error'); else { showToast('🗑 Deleted'); loadInvoices() }
+}
+
+// ── CREATE FORM SETUP ─────────────────────────────────────
+function setupCreateForm() {
+  const today = new Date().toISOString().split('T')[0]
+  const due = new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0]
+  document.getElementById('inv-issue-date').value = today
+  document.getElementById('inv-due-date').value = due
+  document.getElementById('from-email').value = currentUser?.email || ''
+  const nextNum = '#INV-' + String(allInvoices.length + 1).padStart(4, '0')
+  document.getElementById('inv-number').value = nextNum
+  document.getElementById('new-invoice-num').textContent = nextNum + ' · Draft'
+  document.getElementById('line-items').innerHTML = ''
+  addLine(); addLine()
+  calcTotal()
+}
+
+// ── LINE ITEMS ────────────────────────────────────────────
+function addLine() {
+  const row = document.createElement('div')
+  row.className = 'line-item-row'
+  row.innerHTML = `
+    <input class="form-input li-desc" placeholder="Service description" />
+    <input class="form-input li-qty" value="1" oninput="calcTotal()" />
+    <input class="form-input li-rate" value="0" oninput="calcTotal()" />
+    <input class="form-input li-total" value="$0" readonly style="color:var(--accent)" />
+    <button class="icon-btn" onclick="removeLine(this)">✕</button>
+  `
+  document.getElementById('line-items').appendChild(row)
+}
+
+function removeLine(btn) { btn.closest('.line-item-row').remove(); calcTotal() }
+
+function calcTotal() {
+  let total = 0
+  document.querySelectorAll('#line-items .line-item-row').forEach(row => {
+    const qty = parseFloat(row.querySelector('.li-qty').value) || 0
+    const rate = parseFloat(row.querySelector('.li-rate').value) || 0
+    const rt = qty * rate; total += rt
+    row.querySelector('.li-total').value = '$' + rt.toLocaleString()
+  })
+  document.getElementById('subtotal').textContent = '$' + total.toFixed(2)
+  document.getElementById('grand-total').textContent = '$' + total.toFixed(2)
+}
+
+// ── SAVE INVOICE ──────────────────────────────────────────
+async function saveInvoice(status) {
+  const clientName = document.getElementById('client-name').value.trim()
+  if (!clientName) { showToast('❌ Please enter a client name'); return }
+
+  const btnSend = document.getElementById('btn-send')
+  const btnDraft = document.getElementById('btn-save-draft')
+  btnSend.disabled = true; btnDraft.disabled = true
+  btnSend.textContent = 'Saving...'
+
+  try {
+    // Find or create client
+    let clientId = null
+    const { data: existing } = await db.from('clients').select('id').eq('user_id', currentUser.id).eq('name', clientName).limit(1)
+    if (existing?.length) {
+      clientId = existing[0].id
+    } else {
+      const { data: nc, error: ce } = await db.from('clients').insert({
+        user_id: currentUser.id,
+        name: clientName,
+        email: document.getElementById('client-email').value.trim(),
+        address: document.getElementById('client-address').value.trim()
+      }).select('id').single()
+      if (ce) throw ce
+      clientId = nc.id
+    }
+
+    // Save invoice
+    const { data: inv, error: ie } = await db.from('invoices').insert({
+      user_id: currentUser.id,
+      client_id: clientId,
+      invoice_number: document.getElementById('inv-number').value,
+      status,
+      issue_date: document.getElementById('inv-issue-date').value,
+      due_date: document.getElementById('inv-due-date').value,
+      notes: document.getElementById('inv-notes').value
+    }).select('id').single()
+    if (ie) throw ie
+
+    // Save line items
+    const lines = []
+    document.querySelectorAll('#line-items .line-item-row').forEach(row => {
+      const desc = row.querySelector('.li-desc').value.trim()
+      const qty = parseFloat(row.querySelector('.li-qty').value) || 0
+      const rate = parseFloat(row.querySelector('.li-rate').value) || 0
+      if (desc) lines.push({ invoice_id: inv.id, description: desc, quantity: qty, rate })
+    })
+    if (lines.length) { const { error: le } = await db.from('line_items').insert(lines); if (le) throw le }
+
+    showToast(status === 'sent' ? '📧 Invoice sent!' : '💾 Draft saved!')
+    await loadInvoices()
+    showView('invoices', document.querySelector('[onclick*=invoices]'))
+  } catch (err) {
+    showToast('❌ ' + err.message)
+  } finally {
+    btnSend.disabled = false; btnDraft.disabled = false
+    btnSend.textContent = '✉ Send Invoice'
+  }
+}
+
+// ── REMINDER ──────────────────────────────────────────────
+function openReminder(name, num, amount) {
+  document.getElementById('modal-sub').textContent = `Reminder for ${num} · ${name}`
+  document.getElementById('rp-name').textContent = name || 'Client'
+  document.getElementById('rp-num').textContent = num || '#INV'
+  document.getElementById('rp-amount').textContent = amount || '$0'
+  document.getElementById('rp-from').textContent = currentUser?.email || 'You'
+  document.getElementById('reminder-modal').classList.add('open')
+}
+function closeReminder() { document.getElementById('reminder-modal').classList.remove('open') }
+function sendReminder() { closeReminder(); showToast('🔔 Reminder sent!') }
+
+// ── TOAST ─────────────────────────────────────────────────
+function showToast(msg) {
+  const t = document.getElementById('toast')
+  document.getElementById('toast-msg').textContent = msg
+  t.classList.add('show')
+  setTimeout(() => t.classList.remove('show'), 3000)
+}
+
+document.getElementById('reminder-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeReminder()
+})
+</script>
+</body>
+</html>
