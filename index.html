@@ -11,7 +11,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script>
-  const SUPABASE_URL = 'https://qlejmmsizedjpfwicvux.supabase.co'
+  const SUPABASE_URL = 'https://qlejmmsizedjpfwicvux.supabase.co' 
   const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFsZWptbXNpemVkanBmd2ljdnV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NTgwMjksImV4cCI6MjA4OTEzNDAyOX0.oq34AdYu4NknnfqPH8v4bfA4Kg9KngEJ089hecFGoRc'
   const { createClient } = supabase
   const db = createClient(SUPABASE_URL, SUPABASE_KEY)
@@ -218,6 +218,7 @@
     <a class="nav-item active" onclick="showView('dashboard',this)"><span class="nav-icon">▦</span> Dashboard</a>
     <a class="nav-item" onclick="showView('invoices',this)"><span class="nav-icon">◫</span> Invoices</a>
     <a class="nav-item" onclick="showView('create',this)"><span class="nav-icon">＋</span> New Invoice</a>
+    <a class="nav-item" onclick="showView('estimates',this)"><span class="nav-icon">◉</span> Estimates</a>
     <div class="nav-section">Account</div>
     <a class="nav-item" onclick="handleLogout()"><span class="nav-icon">←</span> Sign Out</a>
     <div class="sidebar-bottom">
@@ -283,10 +284,11 @@
     <!-- CREATE INVOICE -->
     <div class="view" id="view-create">
       <div class="page-header">
-        <div><div class="page-title">New Invoice</div><div class="page-subtitle" id="new-invoice-num">Draft</div></div>
+        <div><div class="page-title" id="create-page-title">New Invoice</div><div class="page-subtitle" id="new-invoice-num">Draft</div></div>
         <div style="display:flex;gap:10px;">
           <button class="btn btn-ghost" onclick="showView('dashboard',document.querySelector('[onclick*=dashboard]'))">Cancel</button>
           <button class="btn btn-ghost" id="btn-save-draft" onclick="saveInvoice('draft')">Save Draft</button>
+          <button class="btn btn-ghost" id="btn-save-estimate" onclick="saveInvoice('estimate')" style="display:none">Save Estimate</button>
           <button class="btn btn-primary" id="btn-send" onclick="saveInvoice('sent')">✉ Send Invoice</button>
         </div>
       </div>
@@ -297,6 +299,17 @@
           <div class="form-group"><label class="form-label">Your Name / Business</label><input class="form-input" id="from-name" placeholder="Alex Johnson" /></div>
           <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="from-email" placeholder="you@email.com" /></div>
           <div class="form-group"><label class="form-label">Address (optional)</label><input class="form-input" id="from-address" placeholder="123 Main St" /></div>
+          <div class="form-group">
+            <label class="form-label">Your Logo (optional)</label>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <img id="logo-preview" src="" alt="" style="display:none;width:48px;height:48px;object-fit:contain;border-radius:6px;border:1px solid var(--border);background:var(--surface2);" />
+              <label style="cursor:pointer;flex:1;">
+                <div class="form-input" style="cursor:pointer;color:var(--muted);text-align:center;" id="logo-label">Click to upload logo</div>
+                <input type="file" id="logo-upload" accept="image/*" style="display:none" onchange="handleLogoUpload(this)" />
+              </label>
+              <button class="icon-btn" onclick="clearLogo()" id="logo-clear" style="display:none;">✕</button>
+            </div>
+          </div>
         </div>
         <div class="form-card">
           <div class="form-card-title"><span>2</span> Bill To (Client)</div>
@@ -329,7 +342,11 @@
         <div class="totals-row">
           <div class="totals-box">
             <div class="totals-line"><span>Subtotal</span><span id="subtotal">$0.00</span></div>
-            <div class="totals-line"><span>Tax (0%)</span><span>$0.00</span></div>
+            <div class="totals-line" style="align-items:center;">
+              <span>Tax %</span>
+              <input class="form-input" id="tax-rate" type="number" min="0" max="100" value="0" oninput="calcTotal()" style="width:70px;padding:4px 8px;font-size:12px;text-align:right;" />
+            </div>
+            <div class="totals-line"><span>Tax Amount</span><span id="tax-amount">$0.00</span></div>
             <div class="totals-line total"><span>Total</span><span id="grand-total">$0.00</span></div>
           </div>
         </div>
@@ -339,6 +356,21 @@
         <button class="btn btn-ghost" onclick="showView('dashboard',document.querySelector('[onclick*=dashboard]'))">Cancel</button>
         <button class="btn btn-ghost" onclick="saveInvoice('draft')">Save Draft</button>
         <button class="btn btn-primary" onclick="saveInvoice('sent')">✉ Send Invoice</button>
+      </div>
+    </div>
+
+    <!-- ESTIMATES -->
+    <div class="view" id="view-estimates">
+      <div class="page-header">
+        <div><div class="page-title">Estimates</div><div class="page-subtitle">Send quotes, convert to invoices in one click</div></div>
+        <button class="btn btn-primary" onclick="showEstimateForm()">＋ New Estimate</button>
+      </div>
+      <div class="table-section">
+        <div class="table-header"><div class="table-title">All Estimates</div></div>
+        <table class="invoice-table">
+          <thead><tr><th>Estimate</th><th>Client</th><th>Amount</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody id="estimates-table-body"><tr class="loading-row"><td colspan="6">Loading...</td></tr></tbody>
+        </table>
       </div>
     </div>
 
@@ -352,6 +384,7 @@
         <div style="display:flex;gap:10px;">
           <button class="btn btn-ghost" onclick="showView('invoices', document.querySelector('[onclick*=invoices]'))">← Back</button>
           <button class="btn btn-ghost" id="detail-mark-paid-btn" onclick="markPaidFromDetail()">✓ Mark as Paid</button>
+          <button class="btn btn-ghost" id="detail-convert-btn" onclick="convertEstimateToInvoice()" style="display:none">→ Convert to Invoice</button>
           <button class="btn btn-ghost" onclick="downloadPDF()">↓ Download PDF</button>
           <button class="btn btn-primary" id="detail-remind-btn" onclick="openReminderFromDetail()">🔔 Send Reminder</button>
         </div>
@@ -392,7 +425,7 @@
         <div class="totals-row">
           <div class="totals-box">
             <div class="totals-line"><span>Subtotal</span><span id="detail-subtotal">$0.00</span></div>
-            <div class="totals-line"><span>Tax (0%)</span><span>$0.00</span></div>
+            <div class="totals-line"><span id="detail-tax-label">Tax (0%)</span><span id="detail-tax-amount">$0.00</span></div>
             <div class="totals-line total"><span>Total</span><span id="detail-grand-total">$0.00</span></div>
           </div>
         </div>
@@ -427,6 +460,8 @@
 <script>
 let currentUser = null
 let allInvoices = []
+let logoDataUrl = null
+let createMode = 'invoice' // 'invoice' or 'estimate'
 
 // ── AUTH ──────────────────────────────────────────────────
 function switchAuthTab(tab, el) {
@@ -496,6 +531,12 @@ function showView(name, el) {
   if (el) el.classList.add('active')
   if (name === 'create') setupCreateForm()
   if (name === 'dashboard' || name === 'invoices') loadInvoices()
+  if (name === 'estimates') loadEstimates()
+}
+
+function showEstimateForm() {
+  createMode = 'estimate'
+  showView('create', document.querySelector('[onclick*=create]'))
 }
 
 // ── LOAD INVOICES ─────────────────────────────────────────
@@ -550,6 +591,7 @@ function renderInvoiceTable(tbodyId, invoices) {
       <td><span class="badge badge-${inv.status}">${inv.status}</span></td>
       <td><div class="action-btns">
         <button class="icon-btn" title="View" onclick="viewInvoice('${inv.id}')">👁</button>
+        <button class="icon-btn" title="Duplicate" onclick="duplicateInvoice('${inv.id}')">⧉</button>
         ${inv.status !== 'paid' ? `<button class="icon-btn" title="Remind" onclick="openReminder('${(inv.clients?.name||'').replace(/'/g,"\\'")}','${inv.invoice_number}','$${inv.total}')">🔔</button>` : ''}
         ${inv.status !== 'paid' ? `<button class="icon-btn" title="Mark Paid" onclick="markPaid('${inv.id}')">✓</button>` : ''}
         <button class="icon-btn" title="Delete" onclick="deleteInvoice('${inv.id}')">✕</button>
@@ -585,12 +627,27 @@ function setupCreateForm() {
   document.getElementById('inv-issue-date').value = today
   document.getElementById('inv-due-date').value = due
   document.getElementById('from-email').value = currentUser?.email || ''
-  const nextNum = '#INV-' + String(allInvoices.length + 1).padStart(4, '0')
+  document.getElementById('tax-rate').value = 0
+
+  const isEstimate = createMode === 'estimate'
+  const prefix = isEstimate ? '#EST-' : '#INV-'
+  const nextNum = prefix + String(allInvoices.length + 1).padStart(4, '0')
   document.getElementById('inv-number').value = nextNum
   document.getElementById('new-invoice-num').textContent = nextNum + ' · Draft'
+  document.getElementById('create-page-title').textContent = isEstimate ? 'New Estimate' : 'New Invoice'
+  document.getElementById('btn-send').style.display = isEstimate ? 'none' : 'inline-flex'
+  document.getElementById('btn-save-estimate').style.display = isEstimate ? 'inline-flex' : 'none'
+
+  // Reset logo
+  logoDataUrl = null
+  document.getElementById('logo-preview').style.display = 'none'
+  document.getElementById('logo-label').textContent = 'Click to upload logo'
+  document.getElementById('logo-clear').style.display = 'none'
+
   document.getElementById('line-items').innerHTML = ''
   addLine(); addLine()
   calcTotal()
+  createMode = 'invoice' // reset for next time
 }
 
 // ── LINE ITEMS ────────────────────────────────────────────
@@ -610,14 +667,18 @@ function addLine() {
 function removeLine(btn) { btn.closest('.line-item-row').remove(); calcTotal() }
 
 function calcTotal() {
-  let total = 0
+  let subtotal = 0
   document.querySelectorAll('#line-items .line-item-row').forEach(row => {
     const qty = parseFloat(row.querySelector('.li-qty').value) || 0
     const rate = parseFloat(row.querySelector('.li-rate').value) || 0
-    const rt = qty * rate; total += rt
+    const rt = qty * rate; subtotal += rt
     row.querySelector('.li-total').value = '$' + rt.toLocaleString()
   })
-  document.getElementById('subtotal').textContent = '$' + total.toFixed(2)
+  const taxRate = parseFloat(document.getElementById('tax-rate').value) || 0
+  const taxAmt = subtotal * (taxRate / 100)
+  const total = subtotal + taxAmt
+  document.getElementById('subtotal').textContent = '$' + subtotal.toFixed(2)
+  document.getElementById('tax-amount').textContent = '$' + taxAmt.toFixed(2)
   document.getElementById('grand-total').textContent = '$' + total.toFixed(2)
 }
 
@@ -656,7 +717,8 @@ async function saveInvoice(status) {
       status,
       issue_date: document.getElementById('inv-issue-date').value,
       due_date: document.getElementById('inv-due-date').value,
-      notes: document.getElementById('inv-notes').value
+      notes: document.getElementById('inv-notes').value,
+      tax_rate: parseFloat(document.getElementById('tax-rate').value) || 0
     }).select('id').single()
     if (ie) throw ie
 
@@ -699,9 +761,7 @@ async function viewInvoice(id) {
   document.getElementById('detail-inv-number').textContent = data.invoice_number || '#INV'
   document.getElementById('detail-inv-status').textContent = 'Status: ' + data.status
 
-  document.getElementById('detail-from').innerHTML = `
-    <strong>${currentUser.email}</strong>
-  `
+  document.getElementById('detail-from').innerHTML = `<strong>${currentUser.email}</strong>`
   document.getElementById('detail-to').innerHTML = `
     <strong>${data.clients?.name || '—'}</strong><br>
     ${data.clients?.email || ''}<br>
@@ -712,9 +772,6 @@ async function viewInvoice(id) {
   document.getElementById('detail-due-date').textContent = fmt(data.due_date)
   document.getElementById('detail-payment-method').textContent = data.payment_method || '—'
   document.getElementById('detail-notes').textContent = data.notes || '—'
-  document.getElementById('detail-total').textContent = '$' + detailInvoice.total.toLocaleString()
-  document.getElementById('detail-subtotal').textContent = '$' + detailInvoice.total.toFixed(2)
-  document.getElementById('detail-grand-total').textContent = '$' + detailInvoice.total.toFixed(2)
 
   const badge = document.getElementById('detail-badge')
   badge.className = 'badge badge-' + data.status
@@ -722,8 +779,21 @@ async function viewInvoice(id) {
 
   const markBtn = document.getElementById('detail-mark-paid-btn')
   const remindBtn = document.getElementById('detail-remind-btn')
-  markBtn.style.display = data.status === 'paid' ? 'none' : 'inline-flex'
-  remindBtn.style.display = data.status === 'paid' ? 'none' : 'inline-flex'
+  const convertBtn = document.getElementById('detail-convert-btn')
+  markBtn.style.display = (data.status === 'paid' || data.status === 'estimate') ? 'none' : 'inline-flex'
+  remindBtn.style.display = (data.status === 'paid' || data.status === 'estimate') ? 'none' : 'inline-flex'
+  convertBtn.style.display = data.status === 'estimate' ? 'inline-flex' : 'none'
+
+  // Tax
+  const subtotal = (data.line_items||[]).reduce((s,l) => s+(l.quantity*l.rate), 0)
+  const taxRate = data.tax_rate || 0
+  const taxAmt = subtotal * (taxRate/100)
+  const grandTotal = subtotal + taxAmt
+  document.getElementById('detail-subtotal').textContent = '$' + subtotal.toFixed(2)
+  document.getElementById('detail-tax-label').textContent = `Tax (${taxRate}%)`
+  document.getElementById('detail-tax-amount').textContent = '$' + taxAmt.toFixed(2)
+  document.getElementById('detail-grand-total').textContent = '$' + grandTotal.toFixed(2)
+  document.getElementById('detail-total').textContent = '$' + grandTotal.toLocaleString()
 
   const lineItemsEl = document.getElementById('detail-line-items')
   lineItemsEl.innerHTML = (data.line_items || []).map(l => `
@@ -754,6 +824,117 @@ function openReminderFromDetail() {
   )
 }
 
+// ── LOGO UPLOAD ───────────────────────────────────────────
+function handleLogoUpload(input) {
+  const file = input.files[0]
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = e => {
+    logoDataUrl = e.target.result
+    const preview = document.getElementById('logo-preview')
+    preview.src = logoDataUrl
+    preview.style.display = 'block'
+    document.getElementById('logo-label').textContent = file.name
+    document.getElementById('logo-clear').style.display = 'flex'
+  }
+  reader.readAsDataURL(file)
+}
+
+function clearLogo() {
+  logoDataUrl = null
+  document.getElementById('logo-preview').style.display = 'none'
+  document.getElementById('logo-label').textContent = 'Click to upload logo'
+  document.getElementById('logo-clear').style.display = 'none'
+  document.getElementById('logo-upload').value = ''
+}
+
+// ── DUPLICATE INVOICE ─────────────────────────────────────
+async function duplicateInvoice(id) {
+  const inv = allInvoices.find(i => i.id === id)
+  if (!inv) return
+
+  const { data: full } = await db.from('invoices')
+    .select('*, clients(name, email, address), line_items(description, quantity, rate)')
+    .eq('id', id).single()
+  if (!full) return
+
+  const nextNum = '#INV-' + String(allInvoices.length + 1).padStart(4, '0')
+
+  const { data: newInv, error } = await db.from('invoices').insert({
+    user_id: currentUser.id,
+    client_id: full.client_id,
+    invoice_number: nextNum + '-COPY',
+    status: 'draft',
+    issue_date: new Date().toISOString().split('T')[0],
+    due_date: full.due_date,
+    notes: full.notes,
+    tax_rate: full.tax_rate || 0
+  }).select('id').single()
+
+  if (error) { showToast('❌ Error duplicating'); return }
+
+  const lines = (full.line_items || []).map(l => ({
+    invoice_id: newInv.id,
+    description: l.description,
+    quantity: l.quantity,
+    rate: l.rate
+  }))
+  if (lines.length) await db.from('line_items').insert(lines)
+
+  showToast('⧉ Invoice duplicated!')
+  await loadInvoices()
+}
+
+// ── LOAD ESTIMATES ────────────────────────────────────────
+async function loadEstimates() {
+  const { data, error } = await db
+    .from('invoices')
+    .select('*, clients(name, email), line_items(quantity, rate)')
+    .eq('status', 'estimate')
+    .order('created_at', { ascending: false })
+
+  if (error) { showToast('❌ Error loading estimates'); return }
+
+  const estimates = (data || []).map(inv => ({
+    ...inv,
+    total: (inv.line_items || []).reduce((s, l) => s + (l.quantity * l.rate), 0)
+  }))
+
+  const tbody = document.getElementById('estimates-table-body')
+  if (!estimates.length) {
+    tbody.innerHTML = `<tr class="loading-row"><td colspan="6" style="text-align:center;padding:50px;color:var(--muted)">No estimates yet — create your first quote!</td></tr>`
+    return
+  }
+  tbody.innerHTML = estimates.map(inv => `
+    <tr>
+      <td><div class="invoice-num">${inv.invoice_number || '#EST'}</div></td>
+      <td><div class="client-name">${inv.clients?.name || '—'}</div><div class="client-email">${inv.clients?.email || ''}</div></td>
+      <td><div class="amount">$${inv.total.toLocaleString()}</div></td>
+      <td>${inv.created_at ? new Date(inv.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—'}</td>
+      <td><span class="badge badge-draft">estimate</span></td>
+      <td><div class="action-btns">
+        <button class="icon-btn" title="View & Convert" onclick="viewInvoice('${inv.id}')">👁</button>
+        <button class="icon-btn" title="Delete" onclick="deleteInvoice('${inv.id}')">✕</button>
+      </div></td>
+    </tr>
+  `).join('')
+}
+
+// ── CONVERT ESTIMATE TO INVOICE ───────────────────────────
+async function convertEstimateToInvoice() {
+  if (!detailInvoice) return
+  const nextNum = '#INV-' + String(allInvoices.length + 1).padStart(4, '0')
+  const { error } = await db.from('invoices').update({
+    status: 'draft',
+    invoice_number: nextNum
+  }).eq('id', detailInvoice.id)
+
+  if (error) { showToast('❌ Error converting'); return }
+  showToast('✅ Converted to invoice!')
+  await loadInvoices()
+  await viewInvoice(detailInvoice.id)
+}
+
 // ── DOWNLOAD PDF ──────────────────────────────────────────
 function downloadPDF() {
   if (!detailInvoice) return
@@ -762,80 +943,58 @@ function downloadPDF() {
   const inv = detailInvoice
   const pageW = 210
 
-  // ── Background & accent bar
   doc.setFillColor(14, 14, 15)
   doc.rect(0, 0, pageW, 297, 'F')
   doc.setFillColor(212, 241, 80)
   doc.rect(0, 0, pageW, 2, 'F')
 
-  // ── Logo
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(22)
-  doc.setTextColor(212, 241, 80)
-  doc.text('InvoiceFlow', 20, 22)
+  // Logo or text logo
+  if (logoDataUrl) {
+    try { doc.addImage(logoDataUrl, 'PNG', 20, 10, 20, 20) } catch(e) {}
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.setTextColor(212, 241, 80)
+    doc.text('InvoiceFlow', 44, 22)
+  } else {
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(22); doc.setTextColor(212, 241, 80)
+    doc.text('InvoiceFlow', 20, 22)
+  }
 
-  // ── Invoice number + status badge
-  doc.setFontSize(11)
-  doc.setTextColor(107, 107, 114)
+  doc.setFontSize(11); doc.setTextColor(107, 107, 114)
   doc.text(inv.invoice_number || '#INV', 20, 32)
 
-  const statusColors = { paid: [62,207,142], sent: [124,106,247], overdue: [249,112,102], draft: [107,107,114], pending: [245,166,35] }
+  const statusColors = { paid:[62,207,142], sent:[124,106,247], overdue:[249,112,102], draft:[107,107,114], estimate:[107,107,114] }
   const sc = statusColors[inv.status] || [107,107,114]
   doc.setFillColor(...sc)
   doc.roundedRect(pageW - 50, 24, 30, 8, 2, 2, 'F')
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(9)
-  doc.setTextColor(14, 14, 15)
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(14, 14, 15)
   doc.text(inv.status.toUpperCase(), pageW - 35, 29.5, { align: 'center' })
 
-  // ── Divider
-  doc.setDrawColor(42, 42, 46)
-  doc.setLineWidth(0.3)
+  doc.setDrawColor(42, 42, 46); doc.setLineWidth(0.3)
   doc.line(20, 38, pageW - 20, 38)
 
-  // ── FROM / TO columns
-  doc.setFontSize(8)
-  doc.setTextColor(107, 107, 114)
-  doc.setFont('helvetica', 'normal')
-  doc.text('FROM', 20, 48)
-  doc.text('BILL TO', 110, 48)
-
-  doc.setFontSize(11)
-  doc.setTextColor(240, 240, 238)
-  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(8); doc.setTextColor(107,107,114); doc.setFont('helvetica','normal')
+  doc.text('FROM', 20, 48); doc.text('BILL TO', 110, 48)
+  doc.setFontSize(11); doc.setTextColor(240,240,238); doc.setFont('helvetica','bold')
   doc.text(currentUser.email || '—', 20, 56)
   doc.text(inv.clients?.name || '—', 110, 56)
-
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(9)
-  doc.setTextColor(107, 107, 114)
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(107,107,114)
   if (inv.clients?.email) doc.text(inv.clients.email, 110, 62)
   if (inv.clients?.address) doc.text(inv.clients.address, 110, 68)
 
-  // ── Invoice meta grid
   doc.line(20, 78, pageW - 20, 78)
-
   const metaY = 86
-  const metaItems = [
-    ['ISSUE DATE', inv.issue_date ? new Date(inv.issue_date + 'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—'],
-    ['DUE DATE',   inv.due_date   ? new Date(inv.due_date   + 'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—'],
-    ['PAYMENT',    inv.payment_method || '—'],
-    ['NOTES',      inv.notes || '—'],
-  ]
+  const fmt = d => d ? new Date(d+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—'
+  const metaItems = [['ISSUE DATE', fmt(inv.issue_date)], ['DUE DATE', fmt(inv.due_date)], ['PAYMENT', inv.payment_method||'—'], ['NOTES', inv.notes||'—']]
   metaItems.forEach(([label, value], i) => {
     const x = 20 + (i * 45)
     doc.setFontSize(7); doc.setTextColor(107,107,114); doc.setFont('helvetica','normal')
     doc.text(label, x, metaY)
     doc.setFontSize(9); doc.setTextColor(240,240,238); doc.setFont('helvetica','bold')
-    doc.text(String(value), x, metaY + 6)
+    doc.text(String(value).substring(0,20), x, metaY + 6)
   })
-
   doc.line(20, metaY + 12, pageW - 20, metaY + 12)
 
-  // ── Line items table
   const lineRows = (inv.line_items || []).map(l => [
-    l.description || '',
-    String(l.quantity),
+    l.description || '', String(l.quantity),
     '$' + Number(l.rate).toLocaleString(),
     '$' + (l.quantity * l.rate).toLocaleString()
   ])
@@ -846,24 +1005,43 @@ function downloadPDF() {
     body: lineRows,
     theme: 'plain',
     margin: { left: 20, right: 20 },
-    styles: { font: 'helvetica', fontSize: 9, textColor: [240,240,238], fillColor: [22,22,24], cellPadding: 4 },
-    headStyles: { fontSize: 7, textColor: [107,107,114], fillColor: [14,14,15], fontStyle: 'normal' },
-    alternateRowStyles: { fillColor: [30,30,33] },
-    columnStyles: { 0: { cellWidth: 90 }, 1: { cellWidth: 20, halign:'center' }, 2: { cellWidth: 35, halign:'right' }, 3: { cellWidth: 35, halign:'right' } },
+    styles: { font:'helvetica', fontSize:9, textColor:[240,240,238], fillColor:[22,22,24], cellPadding:4 },
+    headStyles: { fontSize:7, textColor:[107,107,114], fillColor:[14,14,15], fontStyle:'normal' },
+    alternateRowStyles: { fillColor:[30,30,33] },
+    columnStyles: { 0:{cellWidth:90}, 1:{cellWidth:20,halign:'center'}, 2:{cellWidth:35,halign:'right'}, 3:{cellWidth:35,halign:'right'} },
   })
 
-  // ── Total box
-  const finalY = doc.lastAutoTable.finalY + 8
-  doc.setFillColor(30, 30, 33)
-  doc.roundedRect(pageW - 80, finalY, 60, 18, 3, 3, 'F')
-  doc.setFontSize(8); doc.setTextColor(107,107,114); doc.setFont('helvetica','normal')
-  doc.text('TOTAL DUE', pageW - 50, finalY + 7, { align: 'center' })
-  doc.setFontSize(16); doc.setTextColor(212,241,80); doc.setFont('helvetica','bold')
-  doc.text('$' + inv.total.toLocaleString(), pageW - 50, finalY + 14, { align: 'center' })
+  // Totals with tax
+  const subtotal = (inv.line_items||[]).reduce((s,l) => s+(l.quantity*l.rate), 0)
+  const taxRate = inv.tax_rate || 0
+  const taxAmt = subtotal * (taxRate / 100)
+  const grandTotal = subtotal + taxAmt
 
-  // ── Footer
+  const finalY = doc.lastAutoTable.finalY + 6
+  doc.setFillColor(30,30,33)
+  doc.roundedRect(pageW - 85, finalY, 65, taxRate > 0 ? 28 : 18, 3, 3, 'F')
+
+  if (taxRate > 0) {
+    doc.setFontSize(8); doc.setTextColor(107,107,114); doc.setFont('helvetica','normal')
+    doc.text('SUBTOTAL', pageW - 52, finalY + 6, { align:'center' })
+    doc.setFontSize(9); doc.setTextColor(240,240,238)
+    doc.text('$' + subtotal.toLocaleString(), pageW - 52, finalY + 11, { align:'center' })
+    doc.setFontSize(7); doc.setTextColor(107,107,114)
+    doc.text(`TAX (${taxRate}%)`, pageW - 52, finalY + 17, { align:'center' })
+    doc.setFontSize(8); doc.setTextColor(240,240,238)
+    doc.text('$' + taxAmt.toFixed(2), pageW - 52, finalY + 22, { align:'center' })
+  }
+
+  const totalY = taxRate > 0 ? finalY + 34 : finalY + 6
+  doc.setFillColor(30,30,33)
+  doc.roundedRect(pageW - 85, totalY, 65, 18, 3, 3, 'F')
+  doc.setFontSize(8); doc.setTextColor(107,107,114); doc.setFont('helvetica','normal')
+  doc.text('TOTAL DUE', pageW - 52, totalY + 7, { align:'center' })
+  doc.setFontSize(16); doc.setTextColor(212,241,80); doc.setFont('helvetica','bold')
+  doc.text('$' + grandTotal.toLocaleString(), pageW - 52, totalY + 14, { align:'center' })
+
   doc.setFontSize(8); doc.setTextColor(42,42,46); doc.setFont('helvetica','normal')
-  doc.text('Generated by InvoiceFlow · invoiceflow-psi.vercel.app', pageW / 2, 285, { align: 'center' })
+  doc.text('Generated by InvoiceFlow · invoiceflow-psi.vercel.app', pageW / 2, 285, { align:'center' })
 
   doc.save((inv.invoice_number || 'invoice') + '.pdf')
   showToast('📄 PDF downloaded!')
