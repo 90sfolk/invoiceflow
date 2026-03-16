@@ -16,6 +16,13 @@
   const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFsZWptbXNpemVkanBmd2ljdnV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NTgwMjksImV4cCI6MjA4OTEzNDAyOX0.oq34AdYu4NknnfqPH8v4bfA4Kg9KngEJ089hecFGoRc'
   const { createClient } = supabase
   const db = createClient(SUPABASE_URL, SUPABASE_KEY)
+
+  // ✅ LemonSqueezy config
+  const LS_API_KEY    = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiI5NGQ1OWNlZi1kYmI4LTRlYTUtYjE3OC1kMjU0MGZjZDY5MTkiLCJqdGkiOiI2NmUyMjFkZjdlYWNhY2VmYzM0ZjY3MmFlMDk5NzZiNWQ0MTNhYzU4MDUzZTY3ODNiYmI5MDQxZDM1YTg5NjYxMGIzNzkxMzIxNTk3YjNhOCIsImlhdCI6MTc3MzY2MTM1Ni4yMTA2MzMsIm5iZiI6MTc3MzY2MTM1Ni4yMTA2MzUsImV4cCI6NDk0NTQ0OTYwMC4wMjgyOTQsInN1YiI6IjY3MTIyMjciLCJzY29wZXMiOltdfQ.siMcFVwktnvIha0WOkNze9hIh8COoiEiSAJu_ixp8DqNbptfx0pD7fxYLgkr2uaJDbAMMyEgUYhXryLs77FyBPG2GWL88VtD7tXQ7C4c0ZdJ0Ym_lA2wQojtv9HzFYadVkEcRWj-HPD3xkFxtBgmN5Jmbky0DHElOehOQg1HPy25dYDITHslwSF7jrgld3DyzXYGiVKJR9YuUyQBV442cYbtpemgHdQcij-7AiV3eHNpUHPyd-orAkvBz0lnpM6vuM0bo16k0cBvLa7N8_rgXQYpQjYG-DyDEo-Fpyrrv5BQLME2GX3vkOcAezpeWULVX3uRg-zs3GCrZSGp7rYkRz9zGnIPXg3DJIJPTSK_wY-UO1taNawWbWAY6fvZeMMRUiIM2uac5fKcngVfuOJHC9Fh0Ma7M1GsAh9lZxBGQWCGlxH-D1mPbn6Sc5nMBEGxD9qgBRLtAkJMkSbJKu9NWpuBwZrOK6FTmVccDxO7NRLV2oa_NOsKYiNSVVUVx_NxzIgmE18CG8kHe8GH9Esm3H6n7wHdtCf5bDcSiqu4pzrq10M8izv7dkKYUtYU4xEaEcLBg_K3A57w_AHleX3I4x18Qn9_L84OT7SObixeCA5zPv1fuPYG6y-Q5FDrHn2RfeOx18IJ6ivbk1Ryaw4SLUPwJrItPNXsRwJjN9sMTFI'
+  const LS_STORE_ID   = '317322'
+  const LS_VARIANT_ID = '1408989'
+  const TRIAL_DAYS    = 14
+  const FREE_INVOICE_LIMIT = 3
 </script>
 
 <style>
@@ -187,6 +194,20 @@
   .toast.show { transform:translateY(0);opacity:1; }
   .empty-state { text-align:center;padding:60px 20px;color:var(--muted); }
   .loading-row td { text-align:center;color:var(--muted);font-size:13px;padding:40px; }
+  .paywall-overlay { position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(8px);z-index:500;display:none;align-items:center;justify-content:center; }
+  .paywall-overlay.open { display:flex; }
+  .paywall-box { background:var(--surface);border:1px solid var(--border);border-radius:24px;padding:48px 40px;width:460px;text-align:center;animation:slideUp .3s ease; }
+  .paywall-icon { font-size:48px;margin-bottom:16px; }
+  .paywall-title { font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:26px;letter-spacing:-.5px;margin-bottom:8px; }
+  .paywall-sub { color:var(--muted);font-size:14px;line-height:1.6;margin-bottom:28px; }
+  .paywall-features { text-align:left;background:var(--surface2);border-radius:12px;padding:20px;margin-bottom:28px; }
+  .paywall-feature { display:flex;align-items:center;gap:10px;font-size:13px;padding:5px 0; }
+  .paywall-feature-icon { color:var(--accent);font-size:14px;flex-shrink:0; }
+  .paywall-price { margin-bottom:24px; }
+  .paywall-price-amount { font-family:'Plus Jakarta Sans',sans-serif;font-size:40px;font-weight:800;color:var(--accent); }
+  .paywall-price-period { font-size:14px;color:var(--muted); }
+  .paywall-trial-note { font-size:12px;color:var(--muted);margin-top:8px; }
+  .trial-banner { background:rgba(212,241,80,.1);border:1px solid rgba(212,241,80,.3);border-radius:10px;padding:12px 16px;margin-bottom:20px;font-size:13px;color:var(--accent);display:flex;align-items:center;gap:8px; }
   .color-swatch { width:28px;height:28px;border-radius:6px;border:2px solid transparent;cursor:pointer;transition:transform .15s,border-color .15s; }
   .color-swatch:hover { transform:scale(1.15);border-color:var(--text); }
   .report-grid { display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px; }
@@ -275,6 +296,7 @@
     <a class="nav-item" onclick="showView('estimates',this)"><span class="nav-icon">◉</span> Estimates</a>
     <div class="nav-section">Account</div>
     <a class="nav-item" onclick="showView('settings',this)"><span class="nav-icon">⚙</span> Company Settings</a>
+    <a class="nav-item" id="nav-billing" onclick="openBillingPortal()"><span class="nav-icon">💳</span> Billing</a>
     <a class="nav-item" onclick="handleLogout()"><span class="nav-icon">←</span> Sign Out</a>
     <div class="sidebar-bottom">
       <div class="user-pill">
@@ -291,6 +313,10 @@
 
     <!-- DASHBOARD -->
     <div class="view active" id="view-dashboard">
+      <div class="trial-banner" id="trial-banner" style="display:none;">
+        ⏳ <span id="trial-banner-text">You're on a free trial.</span>
+        <button class="btn btn-primary" style="padding:6px 14px;font-size:12px;margin-left:auto;" onclick="goToCheckout()">Upgrade to Pro →</button>
+      </div>
       <div class="page-header">
         <div>
           <div class="page-title">Dashboard</div>
@@ -705,6 +731,37 @@
   </main>
 </div>
 
+<!-- PAYWALL MODAL -->
+<div class="paywall-overlay" id="paywall-modal">
+  <div class="paywall-box">
+    <div class="paywall-icon">⚡</div>
+    <div class="paywall-title" id="paywall-title">Your free trial has ended</div>
+    <div class="paywall-sub" id="paywall-sub">Subscribe to InvoiceFlow Pro to continue creating invoices and accessing all features.</div>
+
+    <div class="paywall-features">
+      <div class="paywall-feature"><span class="paywall-feature-icon">✓</span> Unlimited invoices & estimates</div>
+      <div class="paywall-feature"><span class="paywall-feature-icon">✓</span> Client portal with shareable links</div>
+      <div class="paywall-feature"><span class="paywall-feature-icon">✓</span> Branded PDF export with logo & signature</div>
+      <div class="paywall-feature"><span class="paywall-feature-icon">✓</span> Multi-currency support (8 currencies)</div>
+      <div class="paywall-feature"><span class="paywall-feature-icon">✓</span> Finance reports & analytics</div>
+      <div class="paywall-feature"><span class="paywall-feature-icon">✓</span> Email sending & payment reminders</div>
+    </div>
+
+    <div class="paywall-price">
+      <span class="paywall-price-amount">$12</span>
+      <span class="paywall-price-period">/month</span>
+      <div class="paywall-trial-note">Cancel anytime · No hidden fees</div>
+    </div>
+
+    <button class="btn btn-primary" style="width:100%;padding:14px;font-size:15px;justify-content:center;margin-bottom:10px;" onclick="goToCheckout()">
+      🍋 Subscribe Now — $12/mo
+    </button>
+    <button class="btn btn-ghost" style="width:100%;padding:12px;font-size:13px;justify-content:center;" id="paywall-dismiss" onclick="dismissPaywall()">
+      Maybe later
+    </button>
+  </div>
+</div>
+
 <!-- EMAIL MODAL -->
 <div class="modal-overlay" id="email-modal">
   <div class="modal">
@@ -1085,6 +1142,162 @@ function updateCurrencySymbol() {
   calcTotal()
 }
 
+// ── SUBSCRIPTION ──────────────────────────────────────────
+let subscriptionStatus = null // 'trial' | 'active' | 'expired' | 'free'
+
+async function checkSubscription() {
+  // Check Supabase for subscription record
+  const { data } = await db.from('subscriptions')
+    .select('*')
+    .eq('user_id', currentUser.id)
+    .single()
+
+  const now = new Date()
+
+  if (!data) {
+    // New user — start free trial
+    const trialEnd = new Date(Date.now() + TRIAL_DAYS * 86400000).toISOString()
+    await db.from('subscriptions').insert({
+      user_id: currentUser.id,
+      status: 'trial',
+      trial_ends_at: trialEnd
+    })
+    subscriptionStatus = 'trial'
+    updatePlanBadge()
+    return
+  }
+
+  if (data.status === 'active') {
+    subscriptionStatus = 'active'
+  } else if (data.status === 'trial') {
+    const trialEnd = new Date(data.trial_ends_at)
+    if (now < trialEnd) {
+      subscriptionStatus = 'trial'
+      const daysLeft = Math.ceil((trialEnd - now) / 86400000)
+      updatePlanBadge(`Trial — ${daysLeft}d left`)
+    } else {
+      subscriptionStatus = 'expired'
+      updatePlanBadge('Trial expired')
+    }
+  } else {
+    subscriptionStatus = 'expired'
+    updatePlanBadge('Trial expired')
+  }
+
+  updatePlanBadge()
+}
+
+function updatePlanBadge(label) {
+  const el = document.getElementById('user-plan')
+  const banner = document.getElementById('trial-banner')
+  const bannerText = document.getElementById('trial-banner-text')
+
+  if (subscriptionStatus === 'active') {
+    el.textContent = '✦ Pro'
+    el.style.color = 'var(--paid)'
+    if (banner) banner.style.display = 'none'
+  } else if (subscriptionStatus === 'trial') {
+    el.textContent = label || '✦ Free Trial'
+    el.style.color = 'var(--accent)'
+    if (banner) { banner.style.display = 'flex'; bannerText.textContent = label ? `${label} remaining on your free trial.` : 'You are on a 14-day free trial.' }
+  } else {
+    el.textContent = '⚠ Trial Ended'
+    el.style.color = 'var(--overdue)'
+    if (banner) { banner.style.display = 'flex'; banner.style.background = 'rgba(249,112,102,.1)'; banner.style.borderColor = 'rgba(249,112,102,.3)'; banner.style.color = 'var(--overdue)'; bannerText.textContent = 'Your free trial has ended. Subscribe to keep using InvoiceFlow.' }
+  }
+}
+
+function canCreateInvoice() {
+  if (subscriptionStatus === 'active') return true
+  if (subscriptionStatus === 'trial') return true
+  // Expired — check free limit
+  const nonEstimate = allInvoices.filter(i => i.status !== 'estimate')
+  return nonEstimate.length < FREE_INVOICE_LIMIT
+}
+
+function showPaywall(context) {
+  const title = document.getElementById('paywall-title')
+  const sub   = document.getElementById('paywall-sub')
+  const dismissBtn = document.getElementById('paywall-dismiss')
+
+  if (context === 'expired') {
+    title.textContent = 'Your free trial has ended'
+    sub.textContent = 'Subscribe to InvoiceFlow Pro to continue creating unlimited invoices and access all features.'
+    dismissBtn.style.display = 'inline-flex'
+  } else if (context === 'limit') {
+    title.textContent = `You've used your ${FREE_INVOICE_LIMIT} free invoices`
+    sub.textContent = 'Upgrade to InvoiceFlow Pro for unlimited invoices, estimates, PDF exports, client portal and more.'
+    dismissBtn.style.display = 'inline-flex'
+  }
+  document.getElementById('paywall-modal').classList.add('open')
+}
+
+function dismissPaywall() {
+  document.getElementById('paywall-modal').classList.remove('open')
+}
+
+async function goToCheckout() {
+  showToast('🍋 Opening checkout...')
+  try {
+    // Create checkout via LemonSqueezy API
+    const res = await fetch('https://api.lemonsqueezy.com/v1/checkouts', {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/vnd.api+json',
+        'Content-Type': 'application/vnd.api+json',
+        'Authorization': `Bearer ${LS_API_KEY}`
+      },
+      body: JSON.stringify({
+        data: {
+          type: 'checkouts',
+          attributes: {
+            checkout_data: {
+              email: currentUser.email,
+              custom: { user_id: currentUser.id }
+            }
+          },
+          relationships: {
+            store:   { data: { type: 'stores',   id: LS_STORE_ID   } },
+            variant: { data: { type: 'variants',  id: LS_VARIANT_ID } }
+          }
+        }
+      })
+    })
+    const data = await res.json()
+    const url = data?.data?.attributes?.url
+    if (url) {
+      window.open(url, '_blank')
+      dismissPaywall()
+      showToast('🍋 Checkout opened in new tab!')
+    } else {
+      throw new Error('No checkout URL')
+    }
+  } catch(e) {
+    // Fallback — direct store link
+    window.open(`https://invoiceflow.lemonsqueezy.com/buy/${LS_VARIANT_ID}?checkout[email]=${encodeURIComponent(currentUser.email)}`, '_blank')
+    dismissPaywall()
+  }
+}
+
+async function openBillingPortal() {
+  showToast('Opening billing portal...')
+  // Look up customer portal URL from LemonSqueezy
+  try {
+    const res = await fetch(`https://api.lemonsqueezy.com/v1/customers?filter[email]=${encodeURIComponent(currentUser.email)}`, {
+      headers: { 'Authorization': `Bearer ${LS_API_KEY}`, 'Accept': 'application/vnd.api+json' }
+    })
+    const data = await res.json()
+    const portalUrl = data?.data?.[0]?.attributes?.urls?.customer_portal
+    if (portalUrl) {
+      window.open(portalUrl, '_blank')
+    } else {
+      showToast('No active subscription found')
+    }
+  } catch(e) {
+    showToast('❌ Could not open billing portal')
+  }
+}
+
 // ── AUTH ──────────────────────────────────────────────────
 function switchAuthTab(tab, el) {
   document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'))
@@ -1140,6 +1353,7 @@ db.auth.onAuthStateChange((event, session) => {
     loadCompanySettings()
     setupCreateForm()
     initReportDates()
+    checkSubscription()
   } else {
     currentUser = null
     document.getElementById('auth-screen').classList.remove('hidden')
@@ -1149,6 +1363,11 @@ db.auth.onAuthStateChange((event, session) => {
 
 // ── NAVIGATION ────────────────────────────────────────────
 function showView(name, el) {
+  // Gate invoice/estimate creation behind subscription
+  if (name === 'create') {
+    if (subscriptionStatus === 'expired') { showPaywall('expired'); return }
+    if (!canCreateInvoice()) { showPaywall('limit'); return }
+  }
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'))
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'))
   document.getElementById('view-' + name).classList.add('active')
