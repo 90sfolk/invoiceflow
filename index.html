@@ -163,7 +163,16 @@
   /* MODAL */
   .modal-overlay { position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);z-index:200;display:none;align-items:center;justify-content:center; }
   .modal-overlay.open { display:flex; }
-  .modal { background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:32px;width:420px;animation:slideUp .25s ease; }
+  .modal { background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:32px;width:520px;animation:slideUp .25s ease;max-height:90vh;overflow-y:auto; }
+  .email-field { margin-bottom:14px; }
+  .email-label { font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:6px;display:block; }
+  .email-input { width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--text);font-family:'DM Mono',monospace;font-size:13px;outline:none;transition:border-color .15s; }
+  .email-input:focus { border-color:var(--accent); }
+  .email-textarea { width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--text);font-family:'DM Mono',monospace;font-size:12px;outline:none;resize:vertical;min-height:120px;line-height:1.7;transition:border-color .15s; }
+  .email-textarea:focus { border-color:var(--accent); }
+  .email-summary { background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px;font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.8; }
+  .email-summary strong { color:var(--text); }
+  .pdf-note { display:flex;align-items:center;gap:8px;background:rgba(212,241,80,.08);border:1px solid rgba(212,241,80,.2);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--accent);margin-bottom:16px; }
   @keyframes slideUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
   .modal-title { font-family:'Syne',sans-serif;font-weight:800;font-size:20px;margin-bottom:8px; }
   .modal-sub { color:var(--muted);font-size:13px;margin-bottom:24px; }
@@ -323,6 +332,19 @@
           <div class="form-group"><label class="form-label">Invoice Number</label><input class="form-input" id="inv-number" placeholder="#INV-0001" /></div>
           <div class="form-group"><label class="form-label">Issue Date</label><input class="form-input" type="date" id="inv-issue-date" /></div>
           <div class="form-group"><label class="form-label">Due Date</label><input class="form-input" type="date" id="inv-due-date" /></div>
+          <div class="form-group">
+            <label class="form-label">Currency</label>
+            <select class="form-input" id="inv-currency" onchange="updateCurrencySymbol()">
+              <option value="USD">USD — US Dollar ($)</option>
+              <option value="EUR">EUR — Euro (€)</option>
+              <option value="IDR">IDR — Indonesian Rupiah (Rp)</option>
+              <option value="GBP">GBP — British Pound (£)</option>
+              <option value="SGD">SGD — Singapore Dollar (S$)</option>
+              <option value="AUD">AUD — Australian Dollar (A$)</option>
+              <option value="JPY">JPY — Japanese Yen (¥)</option>
+              <option value="MYR">MYR — Malaysian Ringgit (RM)</option>
+            </select>
+          </div>
         </div>
         <div class="form-card">
           <div class="form-card-title"><span>4</span> Payment & Notes</div>
@@ -334,7 +356,7 @@
 
       <div class="line-items-card">
         <div class="form-card-title"><span>5</span> Line Items</div>
-        <div class="line-item-header"><span>Description</span><span>Qty</span><span>Rate ($)</span><span>Total</span><span></span></div>
+        <div class="line-item-header"><span>Description</span><span>Qty</span><span id="rate-header">Rate ($)</span><span>Total</span><span></span></div>
         <div id="line-items"></div>
         <button class="btn btn-ghost" style="margin-top:12px;font-size:12px;" onclick="addLine()">＋ Add Line Item</button>
         <div class="totals-row">
@@ -384,7 +406,9 @@
           <button class="btn btn-ghost" id="detail-mark-paid-btn" onclick="markPaidFromDetail()">✓ Mark as Paid</button>
           <button class="btn btn-ghost" id="detail-convert-btn" onclick="convertEstimateToInvoice()" style="display:none">→ Convert to Invoice</button>
           <button class="btn btn-ghost" onclick="downloadPDF()">↓ Download PDF</button>
-          <button class="btn btn-primary" id="detail-remind-btn" onclick="openReminderFromDetail()">🔔 Send Reminder</button>
+          <button class="btn btn-ghost" id="detail-share-btn" onclick="sharePortalLink()">🔗 Share Link</button>
+          <button class="btn btn-primary" id="detail-email-btn" onclick="openEmailModal()">✉ Send Invoice</button>
+          <button class="btn btn-ghost" id="detail-remind-btn" onclick="openReminderFromDetail()">🔔 Reminder</button>
         </div>
       </div>
 
@@ -531,6 +555,18 @@
       <div class="form-card" style="margin-bottom:24px;">
         <div class="form-card-title"><span>💳</span> Default Payment Info</div>
         <div class="form-grid" style="margin-bottom:0;">
+          <div class="form-group"><label class="form-label">Default Currency</label>
+            <select class="form-input" id="settings-currency">
+              <option value="USD">USD — US Dollar ($)</option>
+              <option value="EUR">EUR — Euro (€)</option>
+              <option value="IDR">IDR — Indonesian Rupiah (Rp)</option>
+              <option value="GBP">GBP — British Pound (£)</option>
+              <option value="SGD">SGD — Singapore Dollar (S$)</option>
+              <option value="AUD">AUD — Australian Dollar (A$)</option>
+              <option value="JPY">JPY — Japanese Yen (¥)</option>
+              <option value="MYR">MYR — Malaysian Ringgit (RM)</option>
+            </select>
+          </div>
           <div class="form-group"><label class="form-label">Default Payment Method</label>
             <select class="form-input" id="settings-payment-method">
               <option>Bank Transfer</option><option>PayPal</option><option>Stripe</option><option>Wise</option>
@@ -548,6 +584,43 @@
     </div>
 
   </main>
+</div>
+
+<!-- EMAIL MODAL -->
+<div class="modal-overlay" id="email-modal">
+  <div class="modal">
+    <div class="modal-title">✉ Send Invoice</div>
+    <div class="modal-sub" id="email-modal-sub">Compose your email to the client</div>
+
+    <div class="pdf-note">
+      📎 Your PDF invoice will be attached automatically after clicking Send
+    </div>
+
+    <div class="email-field">
+      <label class="email-label">To</label>
+      <input class="email-input" id="email-to" type="email" placeholder="client@email.com" />
+    </div>
+    <div class="email-field">
+      <label class="email-label">CC (optional)</label>
+      <input class="email-input" id="email-cc" type="email" placeholder="cc@email.com" />
+    </div>
+    <div class="email-field">
+      <label class="email-label">Subject</label>
+      <input class="email-input" id="email-subject" />
+    </div>
+    <div class="email-field">
+      <label class="email-label">Message</label>
+      <textarea class="email-textarea" id="email-body"></textarea>
+    </div>
+
+    <div class="email-summary" id="email-summary"></div>
+
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeEmailModal()">Cancel</button>
+      <button class="btn btn-ghost" onclick="downloadPDF();showToast('📎 PDF downloaded — attach it to your email!')">↓ Download PDF First</button>
+      <button class="btn btn-primary" onclick="sendEmail()">✉ Open Email Client</button>
+    </div>
+  </div>
 </div>
 
 <!-- REMINDER MODAL -->
@@ -578,6 +651,38 @@ let allInvoices = []
 let logoDataUrl = null
 let signatureDataUrl = null
 let createMode = 'invoice'
+
+// ── CURRENCY ──────────────────────────────────────────────
+const CURRENCIES = {
+  USD: { symbol: '$',  name: 'US Dollar',          decimals: 2 },
+  EUR: { symbol: '€',  name: 'Euro',                decimals: 2 },
+  IDR: { symbol: 'Rp', name: 'Indonesian Rupiah',   decimals: 0 },
+  GBP: { symbol: '£',  name: 'British Pound',       decimals: 2 },
+  SGD: { symbol: 'S$', name: 'Singapore Dollar',    decimals: 2 },
+  AUD: { symbol: 'A$', name: 'Australian Dollar',   decimals: 2 },
+  JPY: { symbol: '¥',  name: 'Japanese Yen',        decimals: 0 },
+  MYR: { symbol: 'RM', name: 'Malaysian Ringgit',   decimals: 2 },
+}
+
+function getCurrencySymbol(code) {
+  return (CURRENCIES[code] || CURRENCIES['USD']).symbol
+}
+
+function formatMoney(amount, currencyCode) {
+  const cur = CURRENCIES[currencyCode] || CURRENCIES['USD']
+  const formatted = Number(amount).toLocaleString('en', {
+    minimumFractionDigits: cur.decimals,
+    maximumFractionDigits: cur.decimals
+  })
+  return cur.symbol + formatted
+}
+
+function updateCurrencySymbol() {
+  const code = document.getElementById('inv-currency').value
+  const sym = getCurrencySymbol(code)
+  document.getElementById('rate-header').textContent = `Rate (${sym})`
+  calcTotal()
+}
 
 // ── AUTH ──────────────────────────────────────────────────
 function switchAuthTab(tab, el) {
@@ -681,7 +786,8 @@ function renderStats() {
   const overdue = allInvoices.filter(i => i.status === 'overdue')
   const outstanding = [...pending, ...overdue]
   const sum = arr => arr.reduce((s, i) => s + i.total, 0)
-  const fmt = n => '$' + n.toLocaleString()
+  const defaultCur = companySettings.currency || 'USD'
+  const fmt = n => formatMoney(n, defaultCur)
   document.getElementById('stat-outstanding').textContent = fmt(sum(outstanding))
   document.getElementById('stat-outstanding-sub').textContent = outstanding.length + ' invoices'
   document.getElementById('stat-paid').textContent = fmt(sum(paid))
@@ -703,7 +809,7 @@ function renderInvoiceTable(tbodyId, invoices) {
     <tr>
       <td><div class="invoice-num">${inv.invoice_number || '#INV'}</div></td>
       <td><div class="client-name">${inv.clients?.name || '—'}</div><div class="client-email">${inv.clients?.email || ''}</div></td>
-      <td><div class="amount">$${inv.total.toLocaleString()}</div></td>
+      <td><div class="amount">${formatMoney(inv.total, inv.currency || 'USD')}</div></td>
       <td>${inv.due_date ? new Date(inv.due_date + 'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—'}</td>
       <td><span class="badge badge-${inv.status}">${inv.status}</span></td>
       <td><div class="action-btns">
@@ -746,6 +852,10 @@ function setupCreateForm() {
   document.getElementById('tax-rate').value = 0
 
   // Auto-fill payment info from company settings
+  if (companySettings.currency) {
+    document.getElementById('inv-currency').value = companySettings.currency
+  }
+  updateCurrencySymbol()
   if (companySettings.payment_method) {
     const pm = document.getElementById('inv-payment-method')
     for (let opt of pm.options) { if (opt.value === companySettings.payment_method) { opt.selected = true; break } }
@@ -786,19 +896,21 @@ function addLine() {
 function removeLine(btn) { btn.closest('.line-item-row').remove(); calcTotal() }
 
 function calcTotal() {
+  const code = document.getElementById('inv-currency')?.value || 'USD'
+  const sym = getCurrencySymbol(code)
   let subtotal = 0
   document.querySelectorAll('#line-items .line-item-row').forEach(row => {
-    const qty = parseFloat(row.querySelector('.li-qty').value) || 0
+    const qty  = parseFloat(row.querySelector('.li-qty').value)  || 0
     const rate = parseFloat(row.querySelector('.li-rate').value) || 0
     const rt = qty * rate; subtotal += rt
-    row.querySelector('.li-total').value = '$' + rt.toLocaleString()
+    row.querySelector('.li-total').value = formatMoney(rt, code)
   })
   const taxRate = parseFloat(document.getElementById('tax-rate').value) || 0
-  const taxAmt = subtotal * (taxRate / 100)
-  const total = subtotal + taxAmt
-  document.getElementById('subtotal').textContent = '$' + subtotal.toFixed(2)
-  document.getElementById('tax-amount').textContent = '$' + taxAmt.toFixed(2)
-  document.getElementById('grand-total').textContent = '$' + total.toFixed(2)
+  const taxAmt  = subtotal * (taxRate / 100)
+  const total   = subtotal + taxAmt
+  document.getElementById('subtotal').textContent    = formatMoney(subtotal, code)
+  document.getElementById('tax-amount').textContent  = formatMoney(taxAmt, code)
+  document.getElementById('grand-total').textContent = formatMoney(total, code)
 }
 
 // ── SAVE INVOICE ──────────────────────────────────────────
@@ -837,7 +949,8 @@ async function saveInvoice(status) {
       issue_date: document.getElementById('inv-issue-date').value,
       due_date: document.getElementById('inv-due-date').value,
       notes: document.getElementById('inv-notes').value,
-      tax_rate: parseFloat(document.getElementById('tax-rate').value) || 0
+      tax_rate: parseFloat(document.getElementById('tax-rate').value) || 0,
+      currency: document.getElementById('inv-currency').value || 'USD'
     }).select('id').single()
     if (ie) throw ie
 
@@ -878,7 +991,7 @@ async function viewInvoice(id) {
   const fmt = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' }) : '—'
 
   document.getElementById('detail-inv-number').textContent = data.invoice_number || '#INV'
-  document.getElementById('detail-inv-status').textContent = 'Status: ' + data.status
+  document.getElementById('detail-inv-status').textContent = 'Status: ' + data.status + '  ·  Currency: ' + (data.currency || 'USD')
 
   document.getElementById('detail-from').innerHTML = `
     <strong>${companySettings.name || currentUser.email}</strong><br>
@@ -900,23 +1013,29 @@ async function viewInvoice(id) {
   badge.className = 'badge badge-' + data.status
   badge.textContent = data.status
 
-  const markBtn = document.getElementById('detail-mark-paid-btn')
-  const remindBtn = document.getElementById('detail-remind-btn')
+  const markBtn    = document.getElementById('detail-mark-paid-btn')
+  const remindBtn  = document.getElementById('detail-remind-btn')
   const convertBtn = document.getElementById('detail-convert-btn')
-  markBtn.style.display = (data.status === 'paid' || data.status === 'estimate') ? 'none' : 'inline-flex'
-  remindBtn.style.display = (data.status === 'paid' || data.status === 'estimate') ? 'none' : 'inline-flex'
-  convertBtn.style.display = data.status === 'estimate' ? 'inline-flex' : 'none'
+  const emailBtn   = document.getElementById('detail-email-btn')
+  const shareBtn   = document.getElementById('detail-share-btn')
+  const isEstimate = data.status === 'estimate'
+  const isPaid     = data.status === 'paid'
+  markBtn.style.display    = (isPaid || isEstimate) ? 'none' : 'inline-flex'
+  remindBtn.style.display  = (isPaid || isEstimate) ? 'none' : 'inline-flex'
+  emailBtn.style.display   = isEstimate ? 'none' : 'inline-flex'
+  shareBtn.style.display   = isEstimate ? 'none' : 'inline-flex'
+  convertBtn.style.display = isEstimate ? 'inline-flex' : 'none'
 
   // Tax
   const subtotal = (data.line_items||[]).reduce((s,l) => s+(l.quantity*l.rate), 0)
   const taxRate = data.tax_rate || 0
   const taxAmt = subtotal * (taxRate/100)
   const grandTotal = subtotal + taxAmt
-  document.getElementById('detail-subtotal').textContent = '$' + subtotal.toFixed(2)
+  document.getElementById('detail-subtotal').textContent = formatMoney(subtotal, data.currency || 'USD')
   document.getElementById('detail-tax-label').textContent = `Tax (${taxRate}%)`
-  document.getElementById('detail-tax-amount').textContent = '$' + taxAmt.toFixed(2)
-  document.getElementById('detail-grand-total').textContent = '$' + grandTotal.toFixed(2)
-  document.getElementById('detail-total').textContent = '$' + grandTotal.toLocaleString()
+  document.getElementById('detail-tax-amount').textContent = formatMoney(taxAmt, data.currency || 'USD')
+  document.getElementById('detail-grand-total').textContent = formatMoney(grandTotal, data.currency || 'USD')
+  document.getElementById('detail-total').textContent = formatMoney(grandTotal, data.currency || 'USD')
 
   const lineItemsEl = document.getElementById('detail-line-items')
   lineItemsEl.innerHTML = (data.line_items || []).map(l => `
@@ -971,6 +1090,9 @@ async function loadCompanySettings() {
     const brandColor = data.brand_color || '#ffc800'
     document.getElementById('settings-brand-color').value = brandColor
     updateColorPreview(brandColor)
+    if (data.currency) {
+      document.getElementById('settings-currency').value = data.currency
+    }
     const pm = document.getElementById('settings-payment-method')
     if (data.payment_method) {
       for (let opt of pm.options) { if (opt.value === data.payment_method) { opt.selected = true; break } }
@@ -1017,6 +1139,7 @@ async function saveCompanySettings() {
     payment_method: document.getElementById('settings-payment-method').value,
     payment_details: document.getElementById('settings-payment-details').value.trim(),
     default_notes: document.getElementById('settings-notes').value.trim(),
+    currency: document.getElementById('settings-currency').value || 'USD',
     brand_color: document.getElementById('settings-brand-color').value || '#ffc800',
     logo_url: logoDataUrl || null,
     signature_url: signatureDataUrl || null
@@ -1189,7 +1312,7 @@ async function loadEstimates() {
     <tr>
       <td><div class="invoice-num">${inv.invoice_number || '#EST'}</div></td>
       <td><div class="client-name">${inv.clients?.name || '—'}</div><div class="client-email">${inv.clients?.email || ''}</div></td>
-      <td><div class="amount">$${inv.total.toLocaleString()}</div></td>
+      <td><div class="amount">${formatMoney(inv.total, inv.currency || 'USD')}</div></td>
       <td>${inv.created_at ? new Date(inv.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—'}</td>
       <td><span class="badge badge-draft">estimate</span></td>
       <td><div class="action-btns">
@@ -1224,7 +1347,8 @@ function downloadPDF() {
   const W = 210, L = 14, R = W - 14
 
   const fmt   = d => d ? new Date(d+'T00:00:00').toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'}) : '—'
-  const money = n => '$' + Number(n).toLocaleString('en',{minimumFractionDigits:2})
+  const invCurrency = inv.currency || companySettings.currency || 'USD'
+  const money = n => formatMoney(n, invCurrency)
 
   // Brand color
   const brandHex = companySettings.brand_color || '#ffc800'
@@ -1426,6 +1550,143 @@ function downloadPDF() {
   doc.save((inv.invoice_number||'invoice')+'.pdf')
   showToast('📄 PDF downloaded!')
 }
+
+// ── CLIENT PORTAL ─────────────────────────────────────────
+async function sharePortalLink() {
+  if (!detailInvoice) return
+
+  // Check if token already exists
+  let token = detailInvoice.portal_token
+
+  if (!token) {
+    // Generate a unique token
+    token = crypto.randomUUID().replace(/-/g,'')
+
+    const { error } = await db.from('invoices')
+      .update({ portal_token: token })
+      .eq('id', detailInvoice.id)
+
+    if (error) { showToast('❌ Could not generate link'); return }
+    detailInvoice.portal_token = token
+  }
+
+  const portalUrl = `${window.location.origin}/portal.html?token=${token}`
+
+  // Copy to clipboard
+  try {
+    await navigator.clipboard.writeText(portalUrl)
+    showToast('🔗 Portal link copied to clipboard!')
+  } catch(e) {
+    prompt('Copy this link and send to your client:', portalUrl)
+  }
+}
+
+// ── EMAIL ─────────────────────────────────────────────────
+function openEmailModal() {
+  if (!detailInvoice) return
+  const inv = detailInvoice
+  const cur = inv.currency || companySettings.currency || 'USD'
+  const total = formatMoney(inv.total, cur)
+  const dueDate = inv.due_date
+    ? new Date(inv.due_date + 'T00:00:00').toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'})
+    : '—'
+  const fromName = companySettings.name || currentUser.email
+  const clientName = inv.clients?.name || 'there'
+  const clientEmail = inv.clients?.email || ''
+
+  // Pre-fill fields
+  document.getElementById('email-to').value = clientEmail
+  document.getElementById('email-cc').value = ''
+  document.getElementById('email-subject').value =
+    `Invoice ${inv.invoice_number} from ${fromName} — ${total}`
+
+  // Build email body
+  const lineItemsText = (inv.line_items || [])
+    .filter(l => l.description)
+    .map(l => `  • ${l.description} — ${formatMoney(l.quantity * l.rate, cur)}`)
+    .join('\n')
+
+  const taxRate = inv.tax_rate || 0
+  const subtotal = (inv.line_items||[]).reduce((s,l) => s + (l.quantity * l.rate), 0)
+  const taxAmt = subtotal * (taxRate / 100)
+  const grand = subtotal + taxAmt
+
+  let body = `Hi ${clientName},\n\nPlease find attached invoice ${inv.invoice_number} for ${total}, due on ${dueDate}.\n\n`
+
+  body += `--- Invoice Summary ---\n`
+  if (lineItemsText) body += `${lineItemsText}\n`
+  if (taxRate > 0) {
+    body += `\n  Subtotal: ${formatMoney(subtotal, cur)}`
+    body += `\n  Tax (${taxRate}%): ${formatMoney(taxAmt, cur)}`
+  }
+  body += `\n  Total Due: ${formatMoney(grand, cur)}`
+  body += `\n  Due Date: ${dueDate}\n`
+
+  if (companySettings.payment_details) {
+    body += `\n--- Payment Info ---\n  ${companySettings.payment_details}\n`
+  }
+
+  body += `\nIf you have any questions about this invoice, please don't hesitate to reach out.\n`
+
+  // Add portal link if available
+  if (inv.portal_token) {
+    const portalUrl = `${window.location.origin}/portal.html?token=${inv.portal_token}`
+    body += `\nView your invoice online: ${portalUrl}\n`
+  }
+
+  body += `\nThank you for your business!\n\n${fromName}`
+  if (companySettings.email) body += `\n${companySettings.email}`
+  if (companySettings.phone) body += `\n${companySettings.phone}`
+  if (companySettings.website) body += `\n${companySettings.website}`
+
+  document.getElementById('email-body').value = body
+
+  // Summary box
+  document.getElementById('email-modal-sub').textContent =
+    `Sending ${inv.invoice_number} to ${clientName}`
+  document.getElementById('email-summary').innerHTML = `
+    <strong>Invoice:</strong> ${inv.invoice_number} &nbsp;·&nbsp;
+    <strong>Amount:</strong> ${total} &nbsp;·&nbsp;
+    <strong>Due:</strong> ${dueDate}<br>
+    <strong>Client:</strong> ${clientName} &nbsp;·&nbsp;
+    <strong>Email:</strong> ${clientEmail || '(no email saved)'}
+  `
+
+  document.getElementById('email-modal').classList.add('open')
+}
+
+function closeEmailModal() {
+  document.getElementById('email-modal').classList.remove('open')
+}
+
+function sendEmail() {
+  const to      = document.getElementById('email-to').value.trim()
+  const cc      = document.getElementById('email-cc').value.trim()
+  const subject = document.getElementById('email-subject').value.trim()
+  const body    = document.getElementById('email-body').value.trim()
+
+  if (!to) { showToast('❌ Please enter a recipient email'); return }
+
+  // Build mailto URL
+  let mailto = `mailto:${encodeURIComponent(to)}`
+  const params = []
+  if (cc)      params.push(`cc=${encodeURIComponent(cc)}`)
+  if (subject) params.push(`subject=${encodeURIComponent(subject)}`)
+  if (body)    params.push(`body=${encodeURIComponent(body)}`)
+  if (params.length) mailto += '?' + params.join('&')
+
+  // Download PDF first, then open mail client
+  downloadPDF()
+  setTimeout(() => {
+    window.location.href = mailto
+    closeEmailModal()
+    showToast('📧 Email client opened! Attach the downloaded PDF.')
+  }, 800)
+}
+
+document.getElementById('email-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeEmailModal()
+})
 
 // ── REMINDER ──────────────────────────────────────────────
 function openReminder(name, num, amount) {
