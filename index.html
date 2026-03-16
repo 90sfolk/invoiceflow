@@ -125,6 +125,7 @@
   .invoice-table tr:last-child td { border-bottom:none; }
   .invoice-table tr:hover td { background:var(--surface2); }
   .invoice-num { font-weight:500;color:var(--accent);font-size:12px; }
+  .invoice-num-input { background:var(--surface2);border:1px solid var(--accent);border-radius:6px;padding:3px 8px;color:var(--accent);font-family:'DM Mono',monospace;font-size:12px;font-weight:500;outline:none;width:120px; }
   .client-name { font-weight:500; }
   .client-email { font-size:11px;color:var(--muted);margin-top:2px; }
   .amount { font-family:'Syne',sans-serif;font-weight:700;font-size:15px; }
@@ -770,6 +771,52 @@ let logoDataUrl = null
 let signatureDataUrl = null
 let createMode = 'invoice'
 
+// ── INLINE INVOICE NUMBER EDIT ────────────────────────────
+function startEditInvNum(id, currentNum, spanEl) {
+  const wrap = document.getElementById('num-wrap-' + id)
+  if (!wrap || wrap.querySelector('input')) return // already editing
+
+  const input = document.createElement('input')
+  input.className = 'invoice-num-input'
+  input.value = currentNum
+  input.title = 'Press Enter to save, Esc to cancel'
+
+  wrap.innerHTML = ''
+  wrap.appendChild(input)
+  input.focus()
+  input.select()
+
+  const save = async () => {
+    const newNum = input.value.trim()
+    if (!newNum || newNum === currentNum) {
+      // restore original
+      wrap.innerHTML = `<span class="invoice-num" title="Click to edit" onclick="startEditInvNum('${id}','${currentNum}',this)" style="cursor:pointer;border-bottom:1px dashed var(--accent);">${currentNum}</span>`
+      return
+    }
+    const { error } = await db.from('invoices').update({ invoice_number: newNum }).eq('id', id)
+    if (error) {
+      showToast('❌ Could not update invoice number')
+      wrap.innerHTML = `<span class="invoice-num" title="Click to edit" onclick="startEditInvNum('${id}','${currentNum}',this)" style="cursor:pointer;border-bottom:1px dashed var(--accent);">${currentNum}</span>`
+    } else {
+      showToast('✅ Invoice number updated!')
+      // Update local state
+      const inv = allInvoices.find(i => i.id === id)
+      if (inv) inv.invoice_number = newNum
+      wrap.innerHTML = `<span class="invoice-num" title="Click to edit" onclick="startEditInvNum('${id}','${newNum}',this)" style="cursor:pointer;border-bottom:1px dashed var(--accent);">${newNum}</span>`
+    }
+  }
+
+  const cancel = () => {
+    wrap.innerHTML = `<span class="invoice-num" title="Click to edit" onclick="startEditInvNum('${id}','${currentNum}',this)" style="cursor:pointer;border-bottom:1px dashed var(--accent);">${currentNum}</span>`
+  }
+
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter')  { e.preventDefault(); save() }
+    if (e.key === 'Escape') { e.preventDefault(); cancel() }
+  })
+  input.addEventListener('blur', save)
+}
+
 // ── REPORTS ───────────────────────────────────────────────
 let incomeChart = null
 let statusChart = null
@@ -1163,7 +1210,11 @@ function renderInvoiceTable(tbodyId, invoices) {
   }
   tbody.innerHTML = invoices.map(inv => `
     <tr>
-      <td><div class="invoice-num">${inv.invoice_number || '#INV'}</div></td>
+      <td>
+        <div class="invoice-num-wrap" id="num-wrap-${inv.id}">
+          <span class="invoice-num" title="Click to edit" onclick="startEditInvNum('${inv.id}','${(inv.invoice_number||'').replace(/'/g,"\\'")}',this)" style="cursor:pointer;border-bottom:1px dashed var(--accent);">${inv.invoice_number || '#INV'}</span>
+        </div>
+      </td>
       <td><div class="client-name">${inv.clients?.name || '—'}</div><div class="client-email">${inv.clients?.email || ''}</div></td>
       <td><div class="amount">${formatMoney(inv.total, inv.currency || 'USD')}</div></td>
       <td>${inv.due_date ? new Date(inv.due_date + 'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—'}</td>
