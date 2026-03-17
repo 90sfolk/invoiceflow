@@ -826,21 +826,26 @@ async function viewInvoice(id) {
   const markBtn    = document.getElementById('detail-mark-paid-btn')
   const remindBtn  = document.getElementById('detail-remind-btn')
   const convertBtn = document.getElementById('detail-convert-btn')
-  const emailBtn   = document.getElementById('detail-email-btn')
-  const shareBtn   = document.getElementById('detail-share-btn')
-  const waBtn      = document.getElementById('detail-wa-btn')
+  const sendBtn    = document.getElementById('detail-send-btn')
+  const sendWaItem = document.getElementById('send-wa-item')
+  const sendLinkItem = document.getElementById('send-link-item')
   const isEstimate = data.status === 'estimate'
   const isPaid     = data.status === 'paid'
+
   markBtn.style.display    = (isPaid || isEstimate) ? 'none' : 'inline-flex'
   remindBtn.style.display  = (isPaid || isEstimate) ? 'none' : 'inline-flex'
-  emailBtn.style.display   = isEstimate ? 'none' : 'inline-flex'
-  shareBtn.style.display   = isEstimate ? 'none' : 'inline-flex'
   convertBtn.style.display = isEstimate ? 'inline-flex' : 'none'
-  // WA button — always show, changes context label
-  if (waBtn) {
-    waBtn.onclick = () => sendWhatsApp(isEstimate ? 'estimate' : 'invoice')
-    waBtn.title   = isEstimate ? 'Send Estimate via WhatsApp' : 'Send Invoice via WhatsApp'
-  }
+
+  // Update send button label
+  if (sendBtn) sendBtn.innerHTML = isEstimate
+    ? '✉ Send Estimate <span style="font-size:10px;margin-left:2px;">▾</span>'
+    : '✉ Send Invoice <span style="font-size:10px;margin-left:2px;">▾</span>'
+
+  // Update WA item context
+  if (sendWaItem) sendWaItem.onclick = () => { sendWhatsApp(isEstimate ? 'estimate' : 'invoice'); closeSendDropdown() }
+
+  // Hide share link for estimates (no portal token)
+  if (sendLinkItem) sendLinkItem.style.display = isEstimate ? 'none' : 'flex'
 
   // Tax
   const subtotal = (data.line_items||[]).reduce((s,l) => s+(l.quantity*l.rate), 0)
@@ -1718,6 +1723,19 @@ function emailClient() {
   if (!selectedClient?.email) return
   window.location.href = `mailto:${selectedClient.email}`
 }
+
+// ── SEND DROPDOWN ─────────────────────────────────────────
+function toggleSendDropdown(e) {
+  e.stopPropagation()
+  document.getElementById('send-dropdown-menu').classList.toggle('open')
+}
+
+function closeSendDropdown() {
+  document.getElementById('send-dropdown-menu')?.classList.remove('open')
+}
+
+// Close dropdown when clicking anywhere else
+document.addEventListener('click', () => closeSendDropdown())
 
 // ── WHATSAPP ──────────────────────────────────────────────
 function cleanPhone(phone) {
