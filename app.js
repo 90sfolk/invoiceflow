@@ -570,7 +570,7 @@ function showEstimateForm() {
 async function loadInvoices() {
   const { data, error } = await db
     .from('invoices')
-    .select('*, clients(name, email), line_items(quantity, rate)')
+    .select('*, clients(name, email, phone, address), line_items(quantity, rate)')
     .order('created_at', { ascending: false })
 
   if (error) { showToast('❌ Error loading invoices'); return }
@@ -743,6 +743,7 @@ async function saveInvoice(status) {
         user_id: currentUser.id,
         name: clientName,
         email: document.getElementById('client-email').value.trim(),
+        phone: document.getElementById('client-phone')?.value.trim() || '',
         address: document.getElementById('client-address').value.trim()
       }).select('id').single()
       if (ce) throw ce
@@ -790,7 +791,7 @@ let detailInvoice = null
 async function viewInvoice(id) {
   const { data, error } = await db
     .from('invoices')
-    .select('*, clients(name, email, address), line_items(description, quantity, rate)')
+    .select('*, clients(name, email, phone, address), line_items(description, quantity, rate)')
     .eq('id', id)
     .single()
 
@@ -827,6 +828,7 @@ async function viewInvoice(id) {
   const convertBtn = document.getElementById('detail-convert-btn')
   const emailBtn   = document.getElementById('detail-email-btn')
   const shareBtn   = document.getElementById('detail-share-btn')
+  const waBtn      = document.getElementById('detail-wa-btn')
   const isEstimate = data.status === 'estimate'
   const isPaid     = data.status === 'paid'
   markBtn.style.display    = (isPaid || isEstimate) ? 'none' : 'inline-flex'
@@ -834,6 +836,11 @@ async function viewInvoice(id) {
   emailBtn.style.display   = isEstimate ? 'none' : 'inline-flex'
   shareBtn.style.display   = isEstimate ? 'none' : 'inline-flex'
   convertBtn.style.display = isEstimate ? 'inline-flex' : 'none'
+  // WA button — always show, changes context label
+  if (waBtn) {
+    waBtn.onclick = () => sendWhatsApp(isEstimate ? 'estimate' : 'invoice')
+    waBtn.title   = isEstimate ? 'Send Estimate via WhatsApp' : 'Send Invoice via WhatsApp'
+  }
 
   // Tax
   const subtotal = (data.line_items||[]).reduce((s,l) => s+(l.quantity*l.rate), 0)
@@ -1066,7 +1073,7 @@ async function duplicateInvoice(id) {
   if (!inv) return
 
   const { data: full } = await db.from('invoices')
-    .select('*, clients(name, email, address), line_items(description, quantity, rate)')
+    .select('*, clients(name, email, phone, address), line_items(description, quantity, rate)')
     .eq('id', id).single()
   if (!full) return
 
@@ -1101,7 +1108,7 @@ async function duplicateInvoice(id) {
 async function loadEstimates() {
   const { data, error } = await db
     .from('invoices')
-    .select('*, clients(name, email), line_items(quantity, rate)')
+    .select('*, clients(name, email, phone, address), line_items(quantity, rate)')
     .eq('status', 'estimate')
     .order('created_at', { ascending: false })
 
@@ -1529,7 +1536,7 @@ let selectedClient = null
 async function loadClients() {
   const { data, error } = await db
     .from('invoices')
-    .select('*, clients(id, name, email, address), line_items(quantity, rate)')
+    .select('*, clients(id, name, email, phone, address), line_items(quantity, rate)')
     .neq('status', 'estimate')
     .order('created_at', { ascending: false })
 
@@ -1659,6 +1666,9 @@ function openClientPanel(clientId) {
   // Email button
   const emailBtn = document.getElementById('cp-email-btn')
   emailBtn.style.display = client.email ? 'inline-flex' : 'none'
+  // WhatsApp button
+  const waBtn = document.getElementById('cp-wa-btn')
+  if (waBtn) waBtn.style.display = client.phone ? 'inline-flex' : 'none'
 
   // Invoice list
   const invList = document.getElementById('cp-invoice-list')
@@ -1707,4 +1717,96 @@ function newInvoiceForClientId(clientId, clientName) {
 function emailClient() {
   if (!selectedClient?.email) return
   window.location.href = `mailto:${selectedClient.email}`
+}
+
+// ── WHATSAPP ──────────────────────────────────────────────
+function cleanPhone(phone) {
+  // Strip spaces, dashes, brackets — keep + and digits
+  let p = (phone || '').replace(/[\s\-().]/g, '')
+  // Convert leading 0 to country code (Indonesia default +62)
+  if (p.startsWith('0')) p = '+62' + p.slice(1)
+  // Remove + for wa.me URL
+  return p.replace(/^\+/, '')
+}
+
+function buildWaUrl(phone, message) {
+  const p = cleanPhone(phone)
+  const text = encodeURIComponent(message)
+  return p
+    ? `https://wa.me/${p}?text=${text}`
+    : `https://wa.me/?text=${text}`
+}
+
+function sendWhatsApp(context) {
+  if (!detailInvoice) return
+  const inv  = detailInvoice
+  const cur  = inv.currency || companySettings.currency || 'USD'
+  const total = formatMoney(inv.total, cur)
+  const from  = companySettings.name || currentUser.email
+  const dueDate = inv.due_date
+    ? new Date(inv.due_date + 'T00:00:00').toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' })
+    : '—'
+  const clientName = inv.clients?.name || 'there'
+  const phone = inv.clients?.phone || ''
+
+  let message = ''
+
+  if (context === 'invoice') {
+    message = `Hi ${clientName},\n\nPlease find your invoice from ${from}:\n\n📄 *${inv.invoice_number}*\n💰 Amount: *${total}*\n📅 Due: ${dueDate}\n`
+    if (inv.payment_method) message += `\n💳 Payment: ${inv.payment_method}`
+    if (companySettings.payment_details) message += `\n${companySettings.payment_details}`
+    if (inv.portal_token) {
+      const portalUrl = `${window.location.origin}/portal.html?token=${inv.portal_token}`
+      message += `\n\n🔗 View invoice online:\n${portalUrl}`
+    }
+    message += `\n\nThank you for your business! 🙏`
+  } else if (context === 'estimate') {
+    message = `Hi ${clientName},\n\nHere is your estimate from ${from}:\n\n📋 *${inv.invoice_number}*\n💰 Total: *${total}*\n`
+    if (inv.notes) message += `\n📝 ${inv.notes}`
+    message += `\n\nPlease let us know if you'd like to proceed. Thank you! 🙏`
+  }
+
+  const waUrl = buildWaUrl(phone, message)
+  window.open(waUrl, '_blank')
+  showToast('💬 Opening WhatsApp...')
+}
+
+function sendReminderWhatsApp() {
+  if (!detailInvoice) return
+  const inv   = detailInvoice
+  const cur   = inv.currency || companySettings.currency || 'USD'
+  const total = formatMoney(inv.total, cur)
+  const from  = companySettings.name || currentUser.email
+  const dueDate = inv.due_date
+    ? new Date(inv.due_date + 'T00:00:00').toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' })
+    : '—'
+  const clientName = inv.clients?.name || 'there'
+  const phone = inv.clients?.phone || ''
+
+  let message = `Hi ${clientName},\n\nThis is a friendly reminder from *${from}*.\n\n`
+  message += `📄 Invoice *${inv.invoice_number}*\n`
+  message += `💰 Amount: *${total}*\n`
+  message += `📅 Due date: ${dueDate}\n`
+  if (inv.status === 'overdue') message += `\n⚠️ This invoice is now *overdue*.\n`
+  if (companySettings.payment_details) message += `\n💳 Payment details:\n${companySettings.payment_details}\n`
+  if (inv.portal_token) {
+    const portalUrl = `${window.location.origin}/portal.html?token=${inv.portal_token}`
+    message += `\n🔗 View invoice:\n${portalUrl}\n`
+  }
+  message += `\nPlease let us know if you have any questions. Thank you! 🙏`
+
+  const waUrl = buildWaUrl(phone, message)
+  window.open(waUrl, '_blank')
+  closeReminder()
+  showToast('💬 Opening WhatsApp reminder...')
+}
+
+function whatsAppClient() {
+  if (!selectedClient) return
+  const phone = selectedClient.phone || ''
+  const name  = selectedClient.name
+  const from  = companySettings.name || currentUser.email
+  const message = `Hi ${name}, this is ${from}. How can I help you today? 😊`
+  const waUrl = buildWaUrl(phone, message)
+  window.open(waUrl, '_blank')
 }
