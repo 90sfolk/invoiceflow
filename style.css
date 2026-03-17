@@ -259,3 +259,38 @@
 .cp-inv-num { font-size:12px;font-weight:500;color:var(--accent); }
 .cp-inv-date { font-size:11px;color:var(--muted);margin-top:2px; }
 .cp-inv-amount { font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;font-size:14px; }
+
+/* ── SEND DROPDOWN ───────────────────────────────────── */
+.send-dropdown { position:relative; }
+.send-dropdown-menu {
+  display:none;
+  position:absolute;
+  top:calc(100% + 8px);
+  right:0;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:6px;
+  min-width:220px;
+  z-index:150;
+  box-shadow:0 8px 32px rgba(0,0,0,.4);
+  animation:fadeIn .15s ease;
+}
+.send-dropdown-menu.open { display:flex; flex-direction:column; gap:2px; }
+.send-dropdown-item {
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:10px 12px;
+  border-radius:8px;
+  border:none;
+  background:transparent;
+  cursor:pointer;
+  width:100%;
+  text-align:left;
+  transition:background .12s;
+  font-family:'Plus Jakarta Sans',sans-serif;
+}
+.send-dropdown-item:hover { background:var(--surface2); }
+.send-dropdown-item-title { font-size:13px;font-weight:500;color:var(--text); }
+.send-dropdown-item-sub { font-size:11px;color:var(--muted);margin-top:1px; }
