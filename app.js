@@ -386,18 +386,16 @@ function updatePlanBadge(label) {
   const bannerText = document.getElementById('trial-banner-text')
 
   if (subscriptionStatus === 'active') {
-    el.textContent = '✦ Pro'
-    el.style.color = 'var(--paid)'
+    if (el) { el.textContent = '✦ Pro'; el.style.color = 'var(--paid)' }
     if (banner) banner.style.display = 'none'
   } else if (subscriptionStatus === 'trial') {
-    el.textContent = label || '✦ Free Trial'
-    el.style.color = 'var(--accent)'
+    if (el) { el.textContent = label || '✦ Free Trial'; el.style.color = 'var(--accent)' }
     if (banner) { banner.style.display = 'flex'; bannerText.textContent = label ? `${label} remaining on your free trial.` : 'You are on a 14-day free trial.' }
   } else {
-    el.textContent = '⚠ Trial Ended'
-    el.style.color = 'var(--overdue)'
+    if (el) { el.textContent = '⚠ Trial Ended'; el.style.color = 'var(--overdue)' }
     if (banner) { banner.style.display = 'flex'; banner.style.background = 'rgba(249,112,102,.1)'; banner.style.borderColor = 'rgba(249,112,102,.3)'; banner.style.color = 'var(--overdue)'; bannerText.textContent = 'Your free trial has ended. Subscribe to keep using InvoiceFlow.' }
   }
+  updateAccountMenu()
 }
 
 function canCreateInvoice() {
@@ -531,6 +529,7 @@ db.auth.onAuthStateChange((event, session) => {
     const email = currentUser.email
     document.getElementById('user-email-display').textContent = email
     document.getElementById('user-avatar').textContent = email[0].toUpperCase()
+    updateAccountMenu()
     loadInvoices()
     loadCompanySettings()
     setupCreateForm()
@@ -1957,4 +1956,48 @@ async function confirmDeleteAccount() {
   } catch(e) {
     showToast('❌ Error deleting account: ' + e.message)
   }
+}
+
+// ── ACCOUNT MENU ──────────────────────────────────────────
+function toggleAccountMenu(e) {
+  e.stopPropagation()
+  document.getElementById('account-menu').classList.toggle('open')
+}
+
+function closeAccountMenu() {
+  document.getElementById('account-menu')?.classList.remove('open')
+}
+
+document.addEventListener('click', () => closeAccountMenu())
+
+function updateAccountMenu() {
+  const email = currentUser?.email || '—'
+  const initial = email[0].toUpperCase()
+
+  // Update all avatar/email displays
+  ;['user-avatar','menu-avatar'].forEach(id => {
+    const el = document.getElementById(id)
+    if (el) el.textContent = initial
+  })
+  ;['user-email-display','menu-email'].forEach(id => {
+    const el = document.getElementById(id)
+    if (el) el.textContent = email
+  })
+
+  // Plan badge
+  const planText = subscriptionStatus === 'active'
+    ? '✦ Pro'
+    : subscriptionStatus === 'trial'
+    ? '✦ Free Trial'
+    : '⚠ Trial Expired'
+  const planColor = subscriptionStatus === 'active'
+    ? 'var(--paid)'
+    : subscriptionStatus === 'trial'
+    ? 'var(--accent)'
+    : 'var(--overdue)'
+
+  ;['user-plan','menu-plan'].forEach(id => {
+    const el = document.getElementById(id)
+    if (el) { el.textContent = planText; el.style.color = planColor }
+  })
 }
