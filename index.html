@@ -61,13 +61,18 @@
 <div class="app" id="app">
   <aside class="sidebar">
     <div class="logo"><div class="logo-icon">⚡</div>InvoiceFlow</div>
-    <div class="nav-section">Menu</div>
+    <a class="nav-item btn-primary" onclick="showView('create',this)" style="background:var(--accent);color:#0e0e0f;font-weight:600;margin-bottom:8px;">
+      <span class="nav-icon">＋</span> New Invoice
+    </a>
+
+    <div class="nav-section">Overview</div>
     <a class="nav-item active" onclick="showView('dashboard',this)"><span class="nav-icon">▦</span> Dashboard</a>
     <a class="nav-item" onclick="showView('reports',this)"><span class="nav-icon">◈</span> Reports</a>
+
+    <div class="nav-section">Work</div>
     <a class="nav-item" onclick="showView('invoices',this)"><span class="nav-icon">◫</span> Invoices</a>
-    <a class="nav-item" onclick="showView('clients',this)"><span class="nav-icon">◑</span> Clients</a>
-    <a class="nav-item" onclick="showView('create',this)"><span class="nav-icon">＋</span> New Invoice</a>
     <a class="nav-item" onclick="showView('estimates',this)"><span class="nav-icon">◉</span> Estimates</a>
+    <a class="nav-item" onclick="showView('clients',this)"><span class="nav-icon">◑</span> Clients</a>
 
     <div class="sidebar-bottom">
       <div class="user-pill" onclick="toggleAccountMenu(event)" id="user-pill">
