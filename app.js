@@ -559,6 +559,7 @@ function showView(name, el) {
   if (name === 'estimates') loadEstimates()
   if (name === 'reports') { initReportDates(); renderReports() }
   if (name === 'clients') loadClients()
+  if (name === 'account') loadAccountPage()
 }
 
 function showEstimateForm() {
@@ -1827,4 +1828,133 @@ function whatsAppClient() {
   const message = `Hi ${name}, this is ${from}. How can I help you today? 😊`
   const waUrl = buildWaUrl(phone, message)
   window.open(waUrl, '_blank')
+}
+
+// ── ACCOUNT SETTINGS ──────────────────────────────────────
+function loadAccountPage() {
+  const email = currentUser?.email || '—'
+  const created = currentUser?.created_at
+    ? new Date(currentUser.created_at).toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' })
+    : '—'
+
+  document.getElementById('account-avatar').textContent      = email[0].toUpperCase()
+  document.getElementById('account-email-display').textContent = email
+  document.getElementById('account-new-email').value         = email
+  document.getElementById('account-session-email').textContent = email
+  document.getElementById('account-joined').textContent      = `Joined ${created}`
+
+  // Plan display
+  const planEl = document.getElementById('account-plan-display')
+  if (subscriptionStatus === 'active') {
+    planEl.textContent = '✦ Pro Plan — Active'
+    planEl.style.color = 'var(--paid)'
+  } else if (subscriptionStatus === 'trial') {
+    planEl.textContent = '✦ Free Trial'
+    planEl.style.color = 'var(--accent)'
+  } else {
+    planEl.textContent = '⚠ Trial Expired'
+    planEl.style.color = 'var(--overdue)'
+  }
+
+  // Password strength listener
+  const pwInput = document.getElementById('account-new-password')
+  if (pwInput) pwInput.addEventListener('input', e => checkPasswordStrength(e.target.value))
+}
+
+function checkPasswordStrength(pw) {
+  const fill  = document.getElementById('password-strength-fill')
+  const label = document.getElementById('password-strength-label')
+  if (!pw) { fill.style.width = '0%'; label.textContent = ''; return }
+
+  let score = 0
+  if (pw.length >= 6)  score++
+  if (pw.length >= 10) score++
+  if (/[A-Z]/.test(pw)) score++
+  if (/[0-9]/.test(pw)) score++
+  if (/[^A-Za-z0-9]/.test(pw)) score++
+
+  const levels = [
+    { pct:'20%', color:'var(--overdue)',  text:'Very weak' },
+    { pct:'40%', color:'var(--overdue)',  text:'Weak' },
+    { pct:'60%', color:'var(--pending)',  text:'Fair' },
+    { pct:'80%', color:'var(--accent)',   text:'Good' },
+    { pct:'100%',color:'var(--paid)',     text:'Strong 💪' },
+  ]
+  const lvl = levels[Math.min(score, 4)]
+  fill.style.width      = lvl.pct
+  fill.style.background = lvl.color
+  label.textContent     = lvl.text
+  label.style.color     = lvl.color
+}
+
+function togglePasswordVisibility(inputId, btn) {
+  const input = document.getElementById(inputId)
+  if (input.type === 'password') {
+    input.type = 'text'
+    btn.textContent = '🙈'
+  } else {
+    input.type = 'password'
+    btn.textContent = '👁'
+  }
+}
+
+async function updateEmail() {
+  const newEmail = document.getElementById('account-new-email').value.trim()
+  if (!newEmail) { showToast('❌ Please enter an email'); return }
+  if (newEmail === currentUser.email) { showToast('ℹ️ That is already your email'); return }
+
+  const { error } = await db.auth.updateUser({ email: newEmail })
+  if (error) {
+    showToast('❌ ' + error.message)
+  } else {
+    showToast('✅ Check your new email to confirm the change!')
+  }
+}
+
+async function updatePassword() {
+  const newPw  = document.getElementById('account-new-password').value
+  const confPw = document.getElementById('account-confirm-password').value
+
+  if (!newPw)              { showToast('❌ Please enter a new password'); return }
+  if (newPw.length < 6)    { showToast('❌ Password must be at least 6 characters'); return }
+  if (newPw !== confPw)    { showToast('❌ Passwords do not match'); return }
+
+  const { error } = await db.auth.updateUser({ password: newPw })
+  if (error) {
+    showToast('❌ ' + error.message)
+  } else {
+    showToast('✅ Password updated successfully!')
+    document.getElementById('account-new-password').value     = ''
+    document.getElementById('account-confirm-password').value = ''
+    document.getElementById('password-strength-fill').style.width = '0%'
+    document.getElementById('password-strength-label').textContent = ''
+  }
+}
+
+async function confirmDeleteAccount() {
+  const confirmed = confirm(
+    '⚠️ Delete your account?\n\nThis will permanently delete:\n• All your invoices\n• All your clients\n• All your data\n\nThis CANNOT be undone. Type "DELETE" to confirm.'
+  )
+  if (!confirmed) return
+
+  const typed = prompt('Type DELETE to confirm account deletion:')
+  if (typed !== 'DELETE') { showToast('Cancelled — account not deleted'); return }
+
+  showToast('🗑 Deleting account...')
+  try {
+    // Delete all user data first
+    await db.from('line_items').delete().in('invoice_id',
+      (await db.from('invoices').select('id').eq('user_id', currentUser.id)).data?.map(i => i.id) || []
+    )
+    await db.from('invoices').delete().eq('user_id', currentUser.id)
+    await db.from('clients').delete().eq('user_id', currentUser.id)
+    await db.from('company_settings').delete().eq('user_id', currentUser.id)
+    await db.from('subscriptions').delete().eq('user_id', currentUser.id)
+
+    // Sign out
+    await db.auth.signOut()
+    showToast('Account deleted. Goodbye!')
+  } catch(e) {
+    showToast('❌ Error deleting account: ' + e.message)
+  }
 }
