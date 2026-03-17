@@ -70,6 +70,7 @@
     <a class="nav-item" onclick="showView('estimates',this)"><span class="nav-icon">◉</span> Estimates</a>
     <div class="nav-section">Account</div>
     <a class="nav-item" onclick="showView('settings',this)"><span class="nav-icon">⚙</span> Company Settings</a>
+    <a class="nav-item" onclick="showView('account',this)"><span class="nav-icon">👤</span> Account</a>
     <a class="nav-item" id="nav-billing" onclick="openBillingPortal()"><span class="nav-icon">💳</span> Billing</a>
     <a class="nav-item" onclick="handleLogout()"><span class="nav-icon">←</span> Sign Out</a>
     <div class="sidebar-bottom">
@@ -570,6 +571,83 @@
             <tr class="loading-row"><td colspan="7">Loading clients...</td></tr>
           </tbody>
         </table>
+      </div>
+    </div>
+
+    <!-- ACCOUNT SETTINGS -->
+    <div class="view" id="view-account">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Account Settings</div>
+          <div class="page-subtitle">Manage your login credentials and account</div>
+        </div>
+      </div>
+
+      <!-- Account Info -->
+      <div class="form-grid" style="margin-bottom:24px;">
+        <div class="form-card">
+          <div class="form-card-title"><span>👤</span> Account Info</div>
+          <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;">
+            <div id="account-avatar" style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,var(--accent2),var(--accent));display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:#0e0e0f;flex-shrink:0;">?</div>
+            <div>
+              <div style="font-weight:600;font-size:15px;" id="account-email-display">—</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:3px;" id="account-plan-display">—</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:2px;" id="account-joined">—</div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email Address</label>
+            <input class="form-input" id="account-new-email" type="email" placeholder="new@email.com" />
+          </div>
+          <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="updateEmail()">Update Email</button>
+        </div>
+
+        <div class="form-card">
+          <div class="form-card-title"><span>🔒</span> Change Password</div>
+          <div class="form-group">
+            <label class="form-label">New Password</label>
+            <div style="position:relative;">
+              <input class="form-input" id="account-new-password" type="password" placeholder="Min 6 characters" style="padding-right:40px;" />
+              <button onclick="togglePasswordVisibility('account-new-password', this)" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;">👁</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Confirm New Password</label>
+            <div style="position:relative;">
+              <input class="form-input" id="account-confirm-password" type="password" placeholder="Repeat new password" style="padding-right:40px;" />
+              <button onclick="togglePasswordVisibility('account-confirm-password', this)" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;">👁</button>
+            </div>
+          </div>
+          <div id="password-strength-bar" style="height:4px;border-radius:2px;background:var(--border);margin-bottom:14px;overflow:hidden;">
+            <div id="password-strength-fill" style="height:100%;width:0%;transition:width .3s,background .3s;border-radius:2px;"></div>
+          </div>
+          <div id="password-strength-label" style="font-size:11px;color:var(--muted);margin-bottom:14px;"></div>
+          <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="updatePassword()">Update Password</button>
+        </div>
+      </div>
+
+      <!-- Sessions -->
+      <div class="form-card" style="margin-bottom:24px;">
+        <div class="form-card-title"><span>🔑</span> Active Session</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+          <div>
+            <div style="font-size:13px;font-weight:500;">Current session</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:3px;" id="account-session-info">Signed in as <span id="account-session-email">—</span></div>
+          </div>
+          <button class="btn btn-ghost" onclick="handleLogout()" style="font-size:12px;">Sign Out of All Devices</button>
+        </div>
+      </div>
+
+      <!-- Danger Zone -->
+      <div class="form-card" style="border-color:rgba(249,112,102,.3);margin-bottom:24px;">
+        <div class="form-card-title" style="color:var(--overdue);"><span style="background:var(--overdue);">!</span> Danger Zone</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+          <div>
+            <div style="font-size:13px;font-weight:500;">Delete Account</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:3px;">Permanently delete your account and all data. This cannot be undone.</div>
+          </div>
+          <button class="btn" style="background:transparent;color:var(--overdue);border:1px solid var(--overdue);font-size:12px;" onclick="confirmDeleteAccount()">Delete Account</button>
+        </div>
       </div>
     </div>
 
