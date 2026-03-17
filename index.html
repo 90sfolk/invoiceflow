@@ -17,7 +17,7 @@
 <!-- App config — replace with your values -->
 <script>
   const SUPABASE_URL = 'https://qlejmmsizedjpfwicvux.supabase.co'  // ← replace this
-  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFsZWptbXNpemVkanBmd2ljdnV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NTgwMjksImV4cCI6MjA4OTEzNDAyOX0.oq34AdYu4NknnfqPH8v4bfA4Kg9KngEJ089hecFGoRc'
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFsZWptbXNpemVkanBmd2ljdnV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NTgwMjksImV4cCI6MjA4OTEzNDAyOX0.oq34AdYu4NknnfqPH8v4bfA4Kg9KngEJ089hecFGoRc'                             // ← replace this
   const { createClient } = supabase
   const db = createClient(SUPABASE_URL, SUPABASE_KEY)
 
@@ -65,6 +65,7 @@
     <a class="nav-item active" onclick="showView('dashboard',this)"><span class="nav-icon">▦</span> Dashboard</a>
     <a class="nav-item" onclick="showView('reports',this)"><span class="nav-icon">◈</span> Reports</a>
     <a class="nav-item" onclick="showView('invoices',this)"><span class="nav-icon">◫</span> Invoices</a>
+    <a class="nav-item" onclick="showView('clients',this)"><span class="nav-icon">◑</span> Clients</a>
     <a class="nav-item" onclick="showView('create',this)"><span class="nav-icon">＋</span> New Invoice</a>
     <a class="nav-item" onclick="showView('estimates',this)"><span class="nav-icon">◉</span> Estimates</a>
     <div class="nav-section">Account</div>
@@ -501,7 +502,93 @@
       </div>
     </div>
 
+    <!-- CLIENTS -->
+    <div class="view" id="view-clients">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Clients</div>
+          <div class="page-subtitle" id="clients-subtitle">Loading...</div>
+        </div>
+        <button class="btn btn-primary" onclick="showView('create',document.querySelector('[onclick*=create]'))">＋ New Invoice</button>
+      </div>
+
+      <!-- Search -->
+      <div style="margin-bottom:20px;position:relative;">
+        <input class="form-input" id="client-search" placeholder="Search clients by name or email..." oninput="filterClients(this.value)" style="padding-left:36px;" />
+        <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:14px;">⌕</span>
+      </div>
+
+      <div class="table-section">
+        <div class="table-header">
+          <div class="table-title">All Clients</div>
+          <div class="filter-tabs">
+            <button class="filter-tab active" onclick="sortClients('revenue',this)">Top Revenue</button>
+            <button class="filter-tab" onclick="sortClients('name',this)">A → Z</button>
+            <button class="filter-tab" onclick="sortClients('recent',this)">Most Recent</button>
+          </div>
+        </div>
+        <table class="invoice-table">
+          <thead>
+            <tr>
+              <th>Client</th>
+              <th>Invoices</th>
+              <th>Total Billed</th>
+              <th>Total Paid</th>
+              <th>Outstanding</th>
+              <th>Last Invoice</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="clients-table-body">
+            <tr class="loading-row"><td colspan="7">Loading clients...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
   </main>
+
+  <!-- CLIENT DETAIL PANEL -->
+  <div class="client-panel-overlay" id="client-panel-overlay" onclick="closeClientPanel()"></div>
+  <div class="client-panel" id="client-panel">
+    <div class="client-panel-header">
+      <div>
+        <div class="client-panel-avatar" id="cp-avatar">A</div>
+        <div>
+          <div class="client-panel-name" id="cp-name">Client Name</div>
+          <div class="client-panel-email" id="cp-email">email@client.com</div>
+        </div>
+      </div>
+      <button class="icon-btn" onclick="closeClientPanel()" style="flex-shrink:0;">✕</button>
+    </div>
+
+    <div class="client-panel-stats">
+      <div class="cp-stat">
+        <div class="cp-stat-label">Total Billed</div>
+        <div class="cp-stat-value" id="cp-total-billed">$0</div>
+      </div>
+      <div class="cp-stat">
+        <div class="cp-stat-label">Total Paid</div>
+        <div class="cp-stat-value paid" id="cp-total-paid">$0</div>
+      </div>
+      <div class="cp-stat">
+        <div class="cp-stat-label">Outstanding</div>
+        <div class="cp-stat-value pending" id="cp-outstanding">$0</div>
+      </div>
+      <div class="cp-stat">
+        <div class="cp-stat-label">Invoices</div>
+        <div class="cp-stat-value" id="cp-inv-count">0</div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-bottom:20px;">
+      <button class="btn btn-primary" style="flex:1;justify-content:center;font-size:12px;" onclick="newInvoiceForClient()">＋ New Invoice</button>
+      <button class="btn btn-ghost" style="flex:1;justify-content:center;font-size:12px;" id="cp-email-btn" onclick="emailClient()">✉ Email</button>
+    </div>
+
+    <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:12px;">Invoice History</div>
+    <div id="cp-invoice-list"></div>
+  </div>
 </div>
 
 <!-- PAYWALL MODAL -->
