@@ -68,18 +68,40 @@
     <a class="nav-item" onclick="showView('clients',this)"><span class="nav-icon">◑</span> Clients</a>
     <a class="nav-item" onclick="showView('create',this)"><span class="nav-icon">＋</span> New Invoice</a>
     <a class="nav-item" onclick="showView('estimates',this)"><span class="nav-icon">◉</span> Estimates</a>
-    <div class="nav-section">Account</div>
-    <a class="nav-item" onclick="showView('settings',this)"><span class="nav-icon">⚙</span> Company Settings</a>
-    <a class="nav-item" onclick="showView('account',this)"><span class="nav-icon">👤</span> Account</a>
-    <a class="nav-item" id="nav-billing" onclick="openBillingPortal()"><span class="nav-icon">💳</span> Billing</a>
-    <a class="nav-item" onclick="handleLogout()"><span class="nav-icon">←</span> Sign Out</a>
+
     <div class="sidebar-bottom">
-      <div class="user-pill">
+      <div class="user-pill" onclick="toggleAccountMenu(event)" id="user-pill">
         <div class="avatar" id="user-avatar">?</div>
         <div class="user-info">
           <div class="user-name" id="user-email-display">Loading...</div>
-          <div class="user-plan">✦ Free Trial</div>
+          <div class="user-plan" id="user-plan">✦ Free Trial</div>
         </div>
+        <span style="margin-left:auto;color:var(--muted);font-size:10px;">▴</span>
+      </div>
+
+      <!-- Account popup menu -->
+      <div class="account-menu" id="account-menu">
+        <div class="account-menu-header">
+          <div class="account-menu-avatar" id="menu-avatar">?</div>
+          <div>
+            <div class="account-menu-email" id="menu-email">—</div>
+            <div class="account-menu-plan" id="menu-plan">—</div>
+          </div>
+        </div>
+        <div class="account-menu-divider"></div>
+        <button class="account-menu-item" onclick="showView('account',null);closeAccountMenu()">
+          <span>👤</span> Account Settings
+        </button>
+        <button class="account-menu-item" onclick="showView('settings',null);closeAccountMenu()">
+          <span>🏢</span> Company Settings
+        </button>
+        <button class="account-menu-item" onclick="openBillingPortal();closeAccountMenu()">
+          <span>💳</span> Billing & Subscription
+        </button>
+        <div class="account-menu-divider"></div>
+        <button class="account-menu-item danger" onclick="handleLogout()">
+          <span>←</span> Sign Out
+        </button>
       </div>
     </div>
   </aside>
