@@ -558,6 +558,7 @@ function showView(name, el) {
   if (name === 'dashboard' || name === 'invoices') loadInvoices()
   if (name === 'estimates') loadEstimates()
   if (name === 'reports') { initReportDates(); renderReports() }
+  if (name === 'clients') loadClients()
 }
 
 function showEstimateForm() {
@@ -1519,3 +1520,191 @@ function showToast(msg) {
 document.getElementById('reminder-modal').addEventListener('click', function(e) {
   if (e.target === this) closeReminder()
 })
+// ── CLIENTS ───────────────────────────────────────────────
+let allClients = []
+let filteredClients = []
+let clientSortMode = 'revenue'
+let selectedClient = null
+
+async function loadClients() {
+  const { data, error } = await db
+    .from('invoices')
+    .select('*, clients(id, name, email, address), line_items(quantity, rate)')
+    .neq('status', 'estimate')
+    .order('created_at', { ascending: false })
+
+  if (error) { showToast('❌ Error loading clients'); return }
+
+  // Group by client
+  const clientMap = {}
+  ;(data || []).forEach(inv => {
+    if (!inv.clients) return
+    const cid = inv.clients.id
+    const total = (inv.line_items || []).reduce((s, l) => s + (l.quantity * l.rate), 0)
+    if (!clientMap[cid]) {
+      clientMap[cid] = {
+        id:       cid,
+        name:     inv.clients.name,
+        email:    inv.clients.email || '',
+        address:  inv.clients.address || '',
+        invoices: [],
+        totalBilled:   0,
+        totalPaid:     0,
+        lastInvoiceAt: null,
+      }
+    }
+    clientMap[cid].invoices.push({ ...inv, total })
+    clientMap[cid].totalBilled += total
+    if (inv.status === 'paid') clientMap[cid].totalPaid += total
+    if (!clientMap[cid].lastInvoiceAt || inv.issue_date > clientMap[cid].lastInvoiceAt) {
+      clientMap[cid].lastInvoiceAt = inv.issue_date
+    }
+  })
+
+  allClients = Object.values(clientMap)
+  filteredClients = [...allClients]
+  document.getElementById('clients-subtitle').textContent =
+    `${allClients.length} client${allClients.length !== 1 ? 's' : ''}`
+
+  sortAndRenderClients()
+}
+
+function sortAndRenderClients() {
+  const sorted = [...filteredClients]
+  if (clientSortMode === 'revenue') {
+    sorted.sort((a, b) => b.totalBilled - a.totalBilled)
+  } else if (clientSortMode === 'name') {
+    sorted.sort((a, b) => a.name.localeCompare(b.name))
+  } else if (clientSortMode === 'recent') {
+    sorted.sort((a, b) => (b.lastInvoiceAt || '').localeCompare(a.lastInvoiceAt || ''))
+  }
+  renderClientsTable(sorted)
+}
+
+function sortClients(mode, el) {
+  clientSortMode = mode
+  document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'))
+  el.classList.add('active')
+  sortAndRenderClients()
+}
+
+function filterClients(query) {
+  const q = query.toLowerCase().trim()
+  filteredClients = q
+    ? allClients.filter(c =>
+        c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q)
+      )
+    : [...allClients]
+  sortAndRenderClients()
+}
+
+function renderClientsTable(clients) {
+  const cur = companySettings.currency || 'USD'
+  const tbody = document.getElementById('clients-table-body')
+
+  if (!clients.length) {
+    tbody.innerHTML = `<tr class="loading-row"><td colspan="7" style="text-align:center;padding:50px;color:var(--muted)">No clients found</td></tr>`
+    return
+  }
+
+  tbody.innerHTML = clients.map(c => {
+    const outstanding = c.totalBilled - c.totalPaid
+    const lastDate = c.lastInvoiceAt
+      ? new Date(c.lastInvoiceAt + 'T00:00:00').toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' })
+      : '—'
+    const initials = c.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
+
+    return `<tr class="client-row" onclick="openClientPanel('${c.id}')">
+      <td>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div class="client-avatar">${sanitise(initials)}</div>
+          <div class="client-info">
+            <div class="client-row-name">${sanitise(c.name)}</div>
+            <div class="client-row-email">${sanitise(c.email)}</div>
+          </div>
+        </div>
+      </td>
+      <td>${c.invoices.length}</td>
+      <td style="font-weight:500;">${formatMoney(c.totalBilled, cur)}</td>
+      <td style="color:var(--paid);font-weight:500;">${formatMoney(c.totalPaid, cur)}</td>
+      <td style="color:${outstanding > 0 ? 'var(--pending)' : 'var(--muted)'};">${formatMoney(outstanding, cur)}</td>
+      <td>${lastDate}</td>
+      <td>
+        <div class="action-btns">
+          <button class="icon-btn" title="New Invoice" onclick="event.stopPropagation();newInvoiceForClientId('${c.id}','${sanitise(c.name)}')">＋</button>
+          ${c.email ? `<button class="icon-btn" title="Email" onclick="event.stopPropagation();window.location.href='mailto:${sanitise(c.email)}'">✉</button>` : ''}
+        </div>
+      </td>
+    </tr>`
+  }).join('')
+}
+
+function openClientPanel(clientId) {
+  const client = allClients.find(c => c.id === clientId)
+  if (!client) return
+  selectedClient = client
+
+  const cur = companySettings.currency || 'USD'
+  const outstanding = client.totalBilled - client.totalPaid
+  const initials = client.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
+
+  document.getElementById('cp-avatar').textContent    = sanitise(initials)
+  document.getElementById('cp-name').textContent      = sanitise(client.name)
+  document.getElementById('cp-email').textContent     = sanitise(client.email)
+  document.getElementById('cp-total-billed').textContent = formatMoney(client.totalBilled, cur)
+  document.getElementById('cp-total-paid').textContent   = formatMoney(client.totalPaid, cur)
+  document.getElementById('cp-outstanding').textContent  = formatMoney(outstanding, cur)
+  document.getElementById('cp-inv-count').textContent    = client.invoices.length
+
+  // Email button
+  const emailBtn = document.getElementById('cp-email-btn')
+  emailBtn.style.display = client.email ? 'inline-flex' : 'none'
+
+  // Invoice list
+  const invList = document.getElementById('cp-invoice-list')
+  if (!client.invoices.length) {
+    invList.innerHTML = `<div style="color:var(--muted);font-size:13px;text-align:center;padding:20px;">No invoices yet</div>`
+  } else {
+    invList.innerHTML = client.invoices.map(inv => `
+      <div class="cp-inv-row" onclick="viewInvoice('${inv.id}')" style="cursor:pointer;">
+        <div>
+          <div class="cp-inv-num">${sanitise(inv.invoice_number || '#INV')}</div>
+          <div class="cp-inv-date">${inv.issue_date ? new Date(inv.issue_date + 'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—'}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span class="badge badge-${inv.status}">${inv.status}</span>
+          <div class="cp-inv-amount">${formatMoney(inv.total, inv.currency || cur)}</div>
+        </div>
+      </div>
+    `).join('')
+  }
+
+  document.getElementById('client-panel-overlay').classList.add('open')
+  document.getElementById('client-panel').classList.add('open')
+}
+
+function closeClientPanel() {
+  document.getElementById('client-panel-overlay').classList.remove('open')
+  document.getElementById('client-panel').classList.remove('open')
+  selectedClient = null
+}
+
+function newInvoiceForClient() {
+  if (!selectedClient) return
+  closeClientPanel()
+  newInvoiceForClientId(selectedClient.id, selectedClient.name)
+}
+
+function newInvoiceForClientId(clientId, clientName) {
+  showView('create', document.querySelector('[onclick*=create]'))
+  // Pre-fill client name after form is set up
+  setTimeout(() => {
+    const nameInput = document.getElementById('client-name')
+    if (nameInput) nameInput.value = clientName
+  }, 50)
+}
+
+function emailClient() {
+  if (!selectedClient?.email) return
+  window.location.href = `mailto:${selectedClient.email}`
+}
