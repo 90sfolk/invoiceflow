@@ -552,7 +552,8 @@ function showView(name, el) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'))
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'))
   document.getElementById('view-' + name).classList.add('active')
-  if (el) el.classList.add('active')
+  // Don't mark create button as active — it's an action button, not a page
+  if (el && name !== 'create') el.classList.add('active')
   if (name === 'create') setupCreateForm()
   if (name === 'dashboard' || name === 'invoices') loadInvoices()
   if (name === 'estimates') loadEstimates()
