@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>InvoiceFlow — Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+  const SUPABASE_URL = 'https://qlejmmsizedjpfwicvux.supabase.co'
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFsZWptbXNpemVkanBmd2ljdnV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NTgwMjksImV4cCI6MjA4OTEzNDAyOX0.oq34AdYu4NknnfqPH8v4bfA4Kg9KngEJ089hecFGoRc'
+  const { createClient } = supabase
+  const db = createClient(SUPABASE_URL, SUPABASE_KEY)
+  const TRIAL_DAYS         = 14
+  const FREE_INVOICE_LIMIT = 3
+</script>
+</head>
+<body>
+
+<!-- AUTH SCREEN -->
+<div class="auth-screen" id="auth-screen">
+  <div class="auth-box">
+    <div class="auth-logo"><div class="auth-logo-icon">⚡</div>InvoiceFlow</div>
+    <div class="auth-sub">Simple invoicing for freelancers</div>
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="switchAuthTab('login',this)">Sign In</button>
+      <button class="auth-tab" onclick="switchAuthTab('signup',this)">Create Account</button>
+    </div>
+    <div class="auth-error" id="auth-error"></div>
+    <div id="auth-login">
+      <label class="auth-label">Email</label>
+      <input class="auth-input" id="login-email" type="email" placeholder="you@example.com" />
+      <label class="auth-label">Password</label>
+      <input class="auth-input" id="login-password" type="password" placeholder="••••••••" />
+      <button class="auth-btn" onclick="handleLogin()">Sign In →</button>
+    </div>
+    <div id="auth-signup" style="display:none">
+      <label class="auth-label">Email</label>
+      <input class="auth-input" id="signup-email" type="email" placeholder="you@example.com" />
+      <label class="auth-label">Password</label>
+      <input class="auth-input" id="signup-password" type="password" placeholder="Min 6 characters" />
+      <button class="auth-btn" onclick="handleSignup()">Create Free Account →</button>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div class="app" id="app">
+  <aside class="sidebar">
+    <div class="logo"><div class="logo-icon">⚡</div>InvoiceFlow</div>
+
+    <a class="nav-item btn-primary" onclick="showView('create',this)" style="background:var(--accent);color:#0e0e0f;font-weight:600;margin-bottom:8px;">
+      <span class="nav-icon">＋</span> New Invoice
+    </a>
+
+    <div class="nav-section">Overview</div>
+    <a class="nav-item active" onclick="showView('dashboard',this)"><span class="nav-icon">▦</span> Dashboard</a>
+    <a class="nav-item" onclick="showView('reports',this)"><span class="nav-icon">◈</span> Reports</a>
+
+    <div class="nav-section">Work</div>
+    <a class="nav-item" onclick="showView('invoices',this)"><span class="nav-icon">◫</span> Invoices</a>
+    <a class="nav-item" onclick="showView('estimates',this)"><span class="nav-icon">◉</span> Estimates</a>
+    <a class="nav-item" onclick="showView('clients',this)"><span class="nav-icon">◑</span> Clients</a>
+
+    <div class="sidebar-bottom">
+      <div class="user-pill" onclick="toggleAccountMenu(event)" id="user-pill">
+        <div class="avatar" id="user-avatar">?</div>
+        <div class="user-info">
+          <div class="user-name" id="user-email-display">Loading...</div>
+          <div class="user-plan" id="user-plan">✦ Free Trial</div>
+        </div>
+        <span style="margin-left:auto;color:var(--muted);font-size:10px;">▴</span>
+      </div>
+      <div class="account-menu" id="account-menu">
+        <div class="account-menu-header">
+          <div class="account-menu-avatar" id="menu-avatar">?</div>
+          <div>
+            <div class="account-menu-email" id="menu-email">—</div>
+            <div class="account-menu-plan" id="menu-plan">—</div>
+          </div>
+        </div>
+        <div class="account-menu-divider"></div>
+        <button class="account-menu-item" onclick="showView('account',null);closeAccountMenu()"><span>👤</span> Account Settings</button>
+        <button class="account-menu-item" onclick="showView('settings',null);closeAccountMenu()"><span>🏢</span> Company Settings</button>
+        <button class="account-menu-item" onclick="openBillingPortal();closeAccountMenu()"><span>💳</span> Billing & Subscription</button>
+        <div class="account-menu-divider"></div>
+        <button class="account-menu-item danger" onclick="handleLogout()"><span>←</span> Sign Out</button>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+
+    <!-- DASHBOARD -->
+    <div class="view active" id="view-dashboard">
+      <div class="trial-banner" id="trial-banner" style="display:none;">
+        ⏳ <span id="trial-banner-text">You're on a free trial.</span>
+        <button class="btn btn-primary" style="padding:6px 14px;font-size:12px;margin-left:auto;" onclick="goToCheckout()">Upgrade to Pro →</button>
+      </div>
+      <div class="page-header">
+        <div><div class="page-title">Dashboard</div><div class="page-subtitle" id="dash-subtitle">Loading...</div></div>
+        <button class="btn btn-primary" onclick="showView('create',document.querySelector('[onclick*=create]'))">＋ New Invoice</button>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card total"><div class="stat-label">Total Outstanding</div><div class="stat-value" id="stat-outstanding">$0</div><div class="stat-sub" id="stat-outstanding-sub">0 invoices</div></div>
+        <div class="stat-card paid"><div class="stat-label">Paid</div><div class="stat-value" id="stat-paid">$0</div><div class="stat-sub" id="stat-paid-sub">0 invoices</div></div>
+        <div class="stat-card pending"><div class="stat-label">Awaiting Payment</div><div class="stat-value" id="stat-pending">$0</div><div class="stat-sub" id="stat-pending-sub">0 sent</div></div>
+        <div class="stat-card overdue"><div class="stat-label">Overdue</div><div class="stat-value" id="stat-overdue">$0</div><div class="stat-sub" id="stat-overdue-sub">0 invoices</div></div>
+      </div>
+      <div class="table-section">
+        <div class="table-header"><div class="table-title">Recent Invoices</div></div>
+        <table class="invoice-table">
+          <thead><tr><th>Invoice</th><th>Client</th><th>Amount</th><th>Due Date</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody id="dashboard-table-body"><tr class="loading-row"><td colspan="6">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- REPORTS -->
+    <div class="view" id="view-reports">
+      <div class="page-header"><div><div class="page-title">Reports</div><div class="page-subtitle" id="report-subtitle">Financial overview</div></div></div>
+      <div class="date-range-bar">
+        <span class="date-range-label">Period:</span>
+        <input type="date" class="date-input" id="report-from" />
+        <span class="date-range-label">→</span>
+        <input type="date" class="date-input" id="report-to" />
+        <button class="btn btn-primary" style="padding:8px 16px;font-size:12px;" onclick="applyDateRange()">Apply</button>
+        <div style="display:flex;gap:6px;margin-left:8px;">
+          <button class="quick-btn" onclick="setQuick('month',this)">This Month</button>
+          <button class="quick-btn" onclick="setQuick('quarter',this)">3 Months</button>
+          <button class="quick-btn active" onclick="setQuick('year',this)">This Year</button>
+          <button class="quick-btn" onclick="setQuick('all',this)">All Time</button>
+        </div>
+      </div>
+      <div class="kpi-grid">
+        <div class="kpi-card income"><div class="kpi-label">Total Income</div><div class="kpi-value" id="kpi-income">$0</div><div class="kpi-sub" id="kpi-income-sub">0 paid invoices</div></div>
+        <div class="kpi-card outstanding"><div class="kpi-label">Outstanding</div><div class="kpi-value" id="kpi-outstanding">$0</div><div class="kpi-sub" id="kpi-outstanding-sub">0 invoices</div></div>
+        <div class="kpi-card overdue"><div class="kpi-label">Overdue</div><div class="kpi-value" id="kpi-overdue">$0</div><div class="kpi-sub" id="kpi-overdue-sub">0 invoices</div></div>
+        <div class="kpi-card invoices"><div class="kpi-label">Total Invoiced</div><div class="kpi-value" id="kpi-total">$0</div><div class="kpi-sub" id="kpi-total-sub">0 invoices</div></div>
+      </div>
+      <div class="report-grid">
+        <div class="report-card"><div class="report-card-title">Income Over Time</div><canvas id="income-chart" height="200"></canvas></div>
+        <div class="report-card"><div class="report-card-title">Invoice Status Breakdown</div><div class="status-donut-wrap"><canvas id="status-chart" width="140" height="140" style="flex-shrink:0;"></canvas><div class="donut-legend" id="donut-legend"></div></div></div>
+      </div>
+      <div class="report-grid">
+        <div class="report-card"><div class="report-card-title">Top Clients by Revenue</div><div id="top-clients-list"></div></div>
+        <div class="report-card"><div class="report-card-title">Key Metrics</div><div id="avg-metrics"></div></div>
+      </div>
+    </div>
+
+    <!-- ALL INVOICES -->
+    <div class="view" id="view-invoices">
+      <div class="page-header">
+        <div><div class="page-title">All Invoices</div><div class="page-subtitle">Manage and track all your invoices</div></div>
+        <button class="btn btn-primary" onclick="showView('create',document.querySelector('[onclick*=create]'))">＋ New Invoice</button>
+      </div>
+      <div class="table-section">
+        <div class="table-header">
+          <div class="table-title">Invoice List</div>
+          <div class="filter-tabs">
+            <button class="filter-tab active" onclick="filterInvoices('all',this)">All</button>
+            <button class="filter-tab" onclick="filterInvoices('paid',this)">Paid</button>
+            <button class="filter-tab" onclick="filterInvoices('sent',this)">Sent</button>
+            <button class="filter-tab" onclick="filterInvoices('overdue',this)">Overdue</button>
+          </div>
+        </div>
+        <table class="invoice-table">
+          <thead><tr><th>Invoice</th><th>Client</th><th>Amount</th><th>Due Date</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody id="invoices-table-body"><tr class="loading-row"><td colspan="6">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ESTIMATES -->
+    <div class="view" id="view-estimates">
+      <div class="page-header">
+        <div><div class="page-title">Estimates</div><div class="page-subtitle">Send quotes, convert to invoices in one click</div></div>
+        <button class="btn btn-primary" onclick="showEstimateForm()">＋ New Estimate</button>
+      </div>
+      <div class="table-section">
+        <div class="table-header"><div class="table-title">All Estimates</div></div>
+        <table class="invoice-table">
+          <thead><tr><th>Estimate</th><th>Client</th><th>Amount</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody id="estimates-table-body"><tr class="loading-row"><td colspan="6">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- CLIENTS -->
+    <div class="view" id="view-clients">
+      <div class="page-header">
+        <div><div class="page-title">Clients</div><div class="page-subtitle" id="clients-subtitle">Loading...</div></div>
+        <button class="btn btn-primary" onclick="showView('create',document.querySelector('[onclick*=create]'))">＋ New Invoice</button>
+      </div>
+      <div style="margin-bottom:20px;position:relative;">
+        <input class="form-input" id="client-search" placeholder="Search clients by name or email..." oninput="filterClients(this.value)" style="padding-left:36px;" />
+        <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:14px;">⌕</span>
+      </div>
+      <div class="table-section">
+        <div class="table-header">
+          <div class="table-title">All Clients</div>
+          <div class="filter-tabs">
+            <button class="filter-tab active" onclick="sortClients('revenue',this)">Top Revenue</button>
+            <button class="filter-tab" onclick="sortClients('name',this)">A → Z</button>
+            <button class="filter-tab" onclick="sortClients('recent',this)">Most Recent</button>
+          </div>
+        </div>
+        <table class="invoice-table">
+          <thead><tr><th>Client</th><th>Invoices</th><th>Total Billed</th><th>Total Paid</th><th>Outstanding</th><th>Last Invoice</th><th>Actions</th></tr></thead>
+          <tbody id="clients-table-body"><tr class="loading-row"><td colspan="7">Loading clients...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- CREATE INVOICE -->
+    <div class="view" id="view-create">
+      <div class="page-header">
+        <div><div class="page-title" id="create-page-title">New Invoice</div><div class="page-subtitle" id="new-invoice-num">Draft</div></div>
+        <div style="display:flex;gap:10px;">
+          <button class="btn btn-ghost" onclick="showView('dashboard',document.querySelector('[onclick*=dashboard]'))">Cancel</button>
+          <button class="btn btn-ghost" id="btn-save-draft" onclick="saveInvoice('draft')">Save Draft</button>
+          <button class="btn btn-ghost" id="btn-save-estimate" onclick="saveInvoice('estimate')" style="display:none">Save Estimate</button>
+          <button class="btn btn-primary" id="btn-send" onclick="saveInvoice('sent')">✉ Send Invoice</button>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="form-card" style="border-color:var(--accent);border-opacity:.3;">
+          <div class="form-card-title"><span>1</span> From (Your Company)</div>
+          <div id="company-banner" style="display:flex;align-items:center;gap:14px;">
+            <img id="create-logo-preview" src="" style="display:none;width:44px;height:44px;object-fit:contain;border-radius:6px;border:1px solid var(--border);background:var(--surface2);" />
+            <div style="flex:1;">
+              <div id="create-company-name" style="font-weight:500;font-size:14px;color:var(--text);">—</div>
+              <div id="create-company-email" style="font-size:12px;color:var(--muted);margin-top:2px;">—</div>
+              <div id="create-company-address" style="font-size:12px;color:var(--muted);margin-top:1px;"></div>
+            </div>
+            <button class="btn btn-ghost" style="font-size:11px;padding:6px 12px;" onclick="showView('settings',document.querySelector('[onclick*=settings]'))">Edit ⚙</button>
+          </div>
+        </div>
+        <div class="form-card">
+          <div class="form-card-title"><span>2</span> Bill To (Client)</div>
+          <div class="form-group"><label class="form-label">Client Name / Company</label><input class="form-input" id="client-name" placeholder="Acme Corp" /></div>
+          <div class="form-group"><label class="form-label">Client Email</label><input class="form-input" id="client-email" placeholder="billing@client.com" /></div>
+          <div class="form-group"><label class="form-label">Client Phone / WhatsApp</label><input class="form-input" id="client-phone" placeholder="+62 812 3456 7890" /></div>
+          <div class="form-group"><label class="form-label">Client Address (optional)</label><input class="form-input" id="client-address" placeholder="456 Business Ave" /></div>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="form-card">
+          <div class="form-card-title"><span>3</span> Invoice Details</div>
+          <div class="form-group"><label class="form-label">Invoice Number</label><input class="form-input" id="inv-number" placeholder="#INV-0001" /></div>
+          <div class="form-group"><label class="form-label">Issue Date</label><input class="form-input" type="date" id="inv-issue-date" /></div>
+          <div class="form-group"><label class="form-label">Due Date</label><input class="form-input" type="date" id="inv-due-date" /></div>
+          <div class="form-group"><label class="form-label">Currency</label>
+            <select class="form-input" id="inv-currency" onchange="updateCurrencySymbol()">
+              <option value="USD">USD — US Dollar ($)</option>
+              <option value="EUR">EUR — Euro (€)</option>
+              <option value="IDR">IDR — Indonesian Rupiah (Rp)</option>
+              <option value="GBP">GBP — British Pound (£)</option>
+              <option value="SGD">SGD — Singapore Dollar (S$)</option>
+              <option value="AUD">AUD — Australian Dollar (A$)</option>
+              <option value="JPY">JPY — Japanese Yen (¥)</option>
+              <option value="MYR">MYR — Malaysian Ringgit (RM)</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-card">
+          <div class="form-card-title"><span>4</span> Payment & Notes</div>
+          <div class="form-group"><label class="form-label">Payment Method</label><select class="form-input" id="inv-payment-method"><option>Bank Transfer</option><option>PayPal</option><option>Stripe</option><option>Wise</option></select></div>
+          <div class="form-group"><label class="form-label">Payment Details</label><input class="form-input" id="inv-payment-details" placeholder="Account number or PayPal email" /></div>
+          <div class="form-group"><label class="form-label">Notes (optional)</label><input class="form-input" id="inv-notes" placeholder="Thank you for your business!" /></div>
+        </div>
+      </div>
+      <div class="line-items-card">
+        <div class="form-card-title"><span>5</span> Line Items</div>
+        <div class="line-item-header"><span>Description</span><span>Qty</span><span id="rate-header">Rate ($)</span><span>Total</span><span></span></div>
+        <div id="line-items"></div>
+        <button class="btn btn-ghost" style="margin-top:12px;font-size:12px;" onclick="addLine()">＋ Add Line Item</button>
+        <div class="totals-row">
+          <div class="totals-box">
+            <div class="totals-line"><span>Subtotal</span><span id="subtotal">$0.00</span></div>
+            <div class="totals-line" style="align-items:center;"><span>Tax %</span><input class="form-input" id="tax-rate" type="number" min="0" max="100" value="0" oninput="calcTotal()" style="width:70px;padding:4px 8px;font-size:12px;text-align:right;" /></div>
+            <div class="totals-line"><span>Tax Amount</span><span id="tax-amount">$0.00</span></div>
+            <div class="totals-line total"><span>Total</span><span id="grand-total">$0.00</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-ghost" onclick="showView('dashboard',document.querySelector('[onclick*=dashboard]'))">Cancel</button>
+        <button class="btn btn-ghost" onclick="saveInvoice('draft')">Save Draft</button>
+        <button class="btn btn-primary" onclick="saveInvoice('sent')">✉ Send Invoice</button>
+      </div>
+    </div>
+
+    <!-- INVOICE DETAIL -->
+    <div class="view" id="view-detail">
+      <div class="page-header">
+        <div><div class="page-title" id="detail-inv-number">#INV-0001</div><div class="page-subtitle" id="detail-inv-status">Status</div></div>
+        <div style="display:flex;gap:10px;align-items:center;">
+          <button class="btn btn-ghost" onclick="showView('invoices', document.querySelector('[onclick*=invoices]'))">← Back</button>
+          <button class="btn btn-ghost" id="detail-mark-paid-btn" onclick="markPaidFromDetail()">✓ Mark as Paid</button>
+          <button class="btn btn-ghost" id="detail-convert-btn" onclick="convertEstimateToInvoice()" style="display:none">→ Convert to Invoice</button>
+          <button class="btn btn-ghost" onclick="downloadPDF()">↓ Download PDF</button>
+          <button class="btn btn-ghost" id="detail-remind-btn" onclick="openReminderFromDetail()">🔔 Reminder</button>
+          <div class="send-dropdown" id="send-dropdown">
+            <button class="btn btn-primary" id="detail-send-btn" onclick="toggleSendDropdown(event)">✉ Send Invoice <span style="font-size:10px;margin-left:2px;">▾</span></button>
+            <div class="send-dropdown-menu" id="send-dropdown-menu">
+              <button class="send-dropdown-item" onclick="openEmailModal();closeSendDropdown()"><span style="font-size:16px;">📧</span><div><div class="send-dropdown-item-title">Send by Email</div><div class="send-dropdown-item-sub">Opens your email client</div></div></button>
+              <button class="send-dropdown-item" id="send-wa-item" onclick="sendWhatsApp('invoice');closeSendDropdown()"><span style="font-size:16px;">💬</span><div><div class="send-dropdown-item-title">Send via WhatsApp</div><div class="send-dropdown-item-sub">Opens WhatsApp with message</div></div></button>
+              <button class="send-dropdown-item" id="send-link-item" onclick="sharePortalLink();closeSendDropdown()"><span style="font-size:16px;">🔗</span><div><div class="send-dropdown-item-title">Copy Share Link</div><div class="send-dropdown-item-sub">Client views invoice online</div></div></button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="form-card"><div class="form-card-title"><span>↑</span> From</div><div style="font-size:14px;line-height:2;" id="detail-from">—</div></div>
+        <div class="form-card"><div class="form-card-title"><span>↓</span> Bill To</div><div style="font-size:14px;line-height:2;" id="detail-to">—</div></div>
+      </div>
+      <div class="form-grid">
+        <div class="form-card">
+          <div class="form-card-title"><span>i</span> Invoice Details</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div><div class="form-label">Issue Date</div><div id="detail-issue-date" style="font-size:14px;">—</div></div>
+            <div><div class="form-label">Due Date</div><div id="detail-due-date" style="font-size:14px;">—</div></div>
+            <div><div class="form-label">Payment Method</div><div id="detail-payment-method" style="font-size:14px;">—</div></div>
+            <div><div class="form-label">Notes</div><div id="detail-notes" style="font-size:14px;">—</div></div>
+          </div>
+        </div>
+        <div class="form-card" style="display:flex;flex-direction:column;justify-content:center;align-items:center;gap:8px;">
+          <div class="form-label">Total Amount</div>
+          <div id="detail-total" style="font-family:'Plus Jakarta Sans',sans-serif;font-size:48px;font-weight:800;letter-spacing:-2px;color:var(--accent);">$0</div>
+          <span class="badge" id="detail-badge">draft</span>
+        </div>
+      </div>
+      <div class="line-items-card">
+        <div class="form-card-title"><span>≡</span> Line Items</div>
+        <div class="line-item-header"><span>Description</span><span>Qty</span><span>Rate</span><span>Total</span><span></span></div>
+        <div id="detail-line-items"></div>
+        <div class="totals-row">
+          <div class="totals-box">
+            <div class="totals-line"><span>Subtotal</span><span id="detail-subtotal">$0.00</span></div>
+            <div class="totals-line"><span id="detail-tax-label">Tax (0%)</span><span id="detail-tax-amount">$0.00</span></div>
+            <div class="totals-line total"><span>Total</span><span id="detail-grand-total">$0.00</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- COMPANY SETTINGS -->
+    <div class="view" id="view-settings">
+      <div class="page-header">
+        <div><div class="page-title">Company Settings</div><div class="page-subtitle">Set once — used on every invoice automatically</div></div>
+        <button class="btn btn-primary" onclick="saveCompanySettings()">Save Settings</button>
+      </div>
+      <div class="form-grid">
+        <div class="form-card">
+          <div class="form-card-title"><span>🏢</span> Company Info</div>
+          <div class="form-group"><label class="form-label">Company / Your Name</label><input class="form-input" id="settings-name" placeholder="Alex Johnson Design" /></div>
+          <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="settings-email" placeholder="you@email.com" /></div>
+          <div class="form-group"><label class="form-label">Phone (optional)</label><input class="form-input" id="settings-phone" placeholder="+1 234 567 8900" /></div>
+          <div class="form-group"><label class="form-label">Address (optional)</label><input class="form-input" id="settings-address" placeholder="123 Main St, City, Country" /></div>
+          <div class="form-group"><label class="form-label">Website (optional)</label><input class="form-input" id="settings-website" placeholder="www.yoursite.com" /></div>
+        </div>
+        <div class="form-card">
+          <div class="form-card-title"><span>🖼</span> Company Logo</div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:16px;padding:20px 0;">
+            <img id="settings-logo-preview" src="" alt="Logo" style="display:none;max-width:160px;max-height:100px;object-fit:contain;border-radius:8px;border:1px solid var(--border);background:var(--surface2);padding:8px;" />
+            <div id="settings-logo-placeholder" style="width:160px;height:100px;border:2px dashed var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px;">No logo yet</div>
+            <label style="cursor:pointer;width:100%;"><div class="btn btn-ghost" style="width:100%;justify-content:center;">↑ Upload Logo</div><input type="file" id="settings-logo-upload" accept="image/*" style="display:none" onchange="handleSettingsLogoUpload(this)" /></label>
+            <button class="btn btn-ghost" style="width:100%;justify-content:center;color:var(--overdue);border-color:var(--overdue);" onclick="clearSettingsLogo()">Remove Logo</button>
+          </div>
+          <div style="font-size:11px;color:var(--muted);text-align:center;">PNG or JPG recommended. Max 1MB.</div>
+        </div>
+      </div>
+      <div class="form-grid" style="margin-bottom:24px;">
+        <div class="form-card">
+          <div class="form-card-title"><span>✍</span> Authorised Signature</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:16px;">Appears on the PDF above "Authorised Sign".</div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:16px;">
+            <img id="settings-sign-preview" src="" alt="Signature" style="display:none;max-width:200px;max-height:80px;object-fit:contain;border-radius:8px;border:1px solid var(--border);background:white;padding:8px;" />
+            <div id="settings-sign-placeholder" style="width:200px;height:80px;border:2px dashed var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px;">No signature yet</div>
+            <label style="cursor:pointer;width:100%;"><div class="btn btn-ghost" style="width:100%;justify-content:center;">↑ Upload Signature</div><input type="file" id="settings-sign-upload" accept="image/*" style="display:none" onchange="handleSignatureUpload(this)" /></label>
+            <button class="btn btn-ghost" style="width:100%;justify-content:center;color:var(--overdue);border-color:var(--overdue);" onclick="clearSignature()">Remove Signature</button>
+          </div>
+          <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:12px;">PNG with transparent background works best.</div>
+        </div>
+        <div class="form-card">
+          <div class="form-card-title"><span>👁</span> Signature Preview</div>
+          <div style="background:white;border:1px solid var(--border);border-radius:8px;padding:20px;margin-bottom:12px;">
+            <div style="display:flex;justify-content:flex-end;">
+              <div style="width:160px;text-align:center;">
+                <div id="sign-preview-img-wrap" style="height:60px;display:flex;align-items:center;justify-content:center;margin-bottom:8px;">
+                  <img id="sign-preview-img" src="" style="display:none;max-width:150px;max-height:56px;object-fit:contain;" />
+                  <div id="sign-preview-empty" style="color:#ccc;font-size:12px;">signature here</div>
+                </div>
+                <div style="border-top:1px solid #555;padding-top:5px;font-size:11px;color:#888;">Authorised Sign</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="form-card" style="margin-bottom:24px;">
+        <div class="form-card-title"><span>🎨</span> Brand Color</div>
+        <div class="form-label" style="margin-bottom:12px;">Used on your PDF invoice — bars, total box, accents</div>
+        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <input type="color" id="settings-brand-color" value="#ffc800" style="width:48px;height:48px;border:none;border-radius:8px;cursor:pointer;background:none;padding:0;" oninput="updateColorPreview(this.value)" />
+            <div><div style="font-size:13px;font-weight:500;color:var(--text)" id="color-hex-label">#FFC800</div><div style="font-size:11px;color:var(--muted);">Click to change</div></div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;" id="color-presets">
+            <button class="color-swatch" style="background:#ffc800;" onclick="setColor('#ffc800')"></button>
+            <button class="color-swatch" style="background:#3b82f6;" onclick="setColor('#3b82f6')"></button>
+            <button class="color-swatch" style="background:#10b981;" onclick="setColor('#10b981')"></button>
+            <button class="color-swatch" style="background:#ef4444;" onclick="setColor('#ef4444')"></button>
+            <button class="color-swatch" style="background:#8b5cf6;" onclick="setColor('#8b5cf6')"></button>
+            <button class="color-swatch" style="background:#f97316;" onclick="setColor('#f97316')"></button>
+            <button class="color-swatch" style="background:#ec4899;" onclick="setColor('#ec4899')"></button>
+            <button class="color-swatch" style="background:#1e293b;" onclick="setColor('#1e293b')"></button>
+          </div>
+        </div>
+        <div style="margin-top:16px;background:var(--surface2);border-radius:8px;overflow:hidden;">
+          <div id="color-bar-preview" style="height:6px;background:#ffc800;transition:background .2s;"></div>
+          <div style="padding:10px 14px;font-size:11px;color:var(--muted);">Preview — this bar appears on your PDF invoice</div>
+        </div>
+      </div>
+      <div class="form-card" style="margin-bottom:24px;">
+        <div class="form-card-title"><span>💳</span> Default Payment Info</div>
+        <div class="form-grid" style="margin-bottom:0;">
+          <div class="form-group"><label class="form-label">Default Currency</label>
+            <select class="form-input" id="settings-currency">
+              <option value="USD">USD — US Dollar ($)</option>
+              <option value="EUR">EUR — Euro (€)</option>
+              <option value="IDR">IDR — Indonesian Rupiah (Rp)</option>
+              <option value="GBP">GBP — British Pound (£)</option>
+              <option value="SGD">SGD — Singapore Dollar (S$)</option>
+              <option value="AUD">AUD — Australian Dollar (A$)</option>
+              <option value="JPY">JPY — Japanese Yen (¥)</option>
+              <option value="MYR">MYR — Malaysian Ringgit (RM)</option>
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">Default Payment Method</label><select class="form-input" id="settings-payment-method"><option>Bank Transfer</option><option>PayPal</option><option>Stripe</option><option>Wise</option></select></div>
+          <div class="form-group"><label class="form-label">Payment Details</label><input class="form-input" id="settings-payment-details" placeholder="Account number, PayPal email, etc." /></div>
+        </div>
+        <div class="form-group"><label class="form-label">Default Invoice Notes</label><input class="form-input" id="settings-notes" placeholder="Thank you for your business!" /></div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:12px;">
+        <button class="btn btn-ghost" onclick="showView('dashboard',document.querySelector('[onclick*=dashboard]'))">Cancel</button>
+        <button class="btn btn-primary" onclick="saveCompanySettings()">✓ Save Settings</button>
+      </div>
+    </div>
+
+    <!-- ACCOUNT SETTINGS -->
+    <div class="view" id="view-account">
+      <div class="page-header"><div><div class="page-title">Account Settings</div><div class="page-subtitle">Manage your login credentials and account</div></div></div>
+      <div class="form-grid" style="margin-bottom:24px;">
+        <div class="form-card">
+          <div class="form-card-title"><span>👤</span> Account Info</div>
+          <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;">
+            <div id="account-avatar" style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,var(--accent2),var(--accent));display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:#0e0e0f;flex-shrink:0;">?</div>
+            <div>
+              <div style="font-weight:600;font-size:15px;" id="account-email-display">—</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:3px;" id="account-plan-display">—</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:2px;" id="account-joined">—</div>
+            </div>
+          </div>
+          <div class="form-group"><label class="form-label">Email Address</label><input class="form-input" id="account-new-email" type="email" placeholder="new@email.com" /></div>
+          <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="updateEmail()">Update Email</button>
+        </div>
+        <div class="form-card">
+          <div class="form-card-title"><span>🔒</span> Change Password</div>
+          <div class="form-group"><label class="form-label">New Password</label><div style="position:relative;"><input class="form-input" id="account-new-password" type="password" placeholder="Min 6 characters" style="padding-right:40px;" /><button onclick="togglePasswordVisibility('account-new-password',this)" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;">👁</button></div></div>
+          <div class="form-group"><label class="form-label">Confirm New Password</label><div style="position:relative;"><input class="form-input" id="account-confirm-password" type="password" placeholder="Repeat new password" style="padding-right:40px;" /><button onclick="togglePasswordVisibility('account-confirm-password',this)" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;">👁</button></div></div>
+          <div id="password-strength-bar" style="height:4px;border-radius:2px;background:var(--border);margin-bottom:14px;overflow:hidden;"><div id="password-strength-fill" style="height:100%;width:0%;transition:width .3s,background .3s;border-radius:2px;"></div></div>
+          <div id="password-strength-label" style="font-size:11px;color:var(--muted);margin-bottom:14px;"></div>
+          <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="updatePassword()">Update Password</button>
+        </div>
+      </div>
+      <div class="form-card" style="margin-bottom:24px;">
+        <div class="form-card-title"><span>🔑</span> Active Session</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+          <div><div style="font-size:13px;font-weight:500;">Current session</div><div style="font-size:12px;color:var(--muted);margin-top:3px;">Signed in as <span id="account-session-email">—</span></div></div>
+          <button class="btn btn-ghost" onclick="handleLogout()" style="font-size:12px;">Sign Out of All Devices</button>
+        </div>
+      </div>
+      <div class="form-card" style="border-color:rgba(249,112,102,.3);margin-bottom:24px;">
+        <div class="form-card-title" style="color:var(--overdue);"><span style="background:var(--overdue);">!</span> Danger Zone</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+          <div><div style="font-size:13px;font-weight:500;">Delete Account</div><div style="font-size:12px;color:var(--muted);margin-top:3px;">Permanently delete your account and all data. This cannot be undone.</div></div>
+          <button class="btn" style="background:transparent;color:var(--overdue);border:1px solid var(--overdue);font-size:12px;" onclick="confirmDeleteAccount()">Delete Account</button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- CLIENT DETAIL PANEL -->
+<div class="client-panel-overlay" id="client-panel-overlay" onclick="closeClientPanel()"></div>
+<div class="client-panel" id="client-panel">
+  <div class="client-panel-header">
+    <div>
+      <div class="client-panel-avatar" id="cp-avatar">A</div>
+      <div><div class="client-panel-name" id="cp-name">Client Name</div><div class="client-panel-email" id="cp-email">email@client.com</div></div>
+    </div>
+    <button class="icon-btn" onclick="closeClientPanel()" style="flex-shrink:0;">✕</button>
+  </div>
+  <div class="client-panel-stats">
+    <div class="cp-stat"><div class="cp-stat-label">Total Billed</div><div class="cp-stat-value" id="cp-total-billed">$0</div></div>
+    <div class="cp-stat"><div class="cp-stat-label">Total Paid</div><div class="cp-stat-value paid" id="cp-total-paid">$0</div></div>
+    <div class="cp-stat"><div class="cp-stat-label">Outstanding</div><div class="cp-stat-value pending" id="cp-outstanding">$0</div></div>
+    <div class="cp-stat"><div class="cp-stat-label">Invoices</div><div class="cp-stat-value" id="cp-inv-count">0</div></div>
+  </div>
+  <div style="display:flex;gap:8px;margin-bottom:20px;">
+    <button class="btn btn-primary" style="flex:1;justify-content:center;font-size:12px;" onclick="newInvoiceForClient()">＋ New Invoice</button>
+    <button class="btn btn-ghost" style="flex:1;justify-content:center;font-size:12px;" id="cp-email-btn" onclick="emailClient()">✉ Email</button>
+    <button class="btn btn-ghost" style="flex:1;justify-content:center;font-size:12px;color:#25d366;border-color:#25d366;" id="cp-wa-btn" onclick="whatsAppClient()">💬 WA</button>
+  </div>
+  <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:12px;">Invoice History</div>
+  <div id="cp-invoice-list"></div>
+</div>
+
+<!-- PAYWALL MODAL -->
+<div class="paywall-overlay" id="paywall-modal">
+  <div class="paywall-box">
+    <div class="paywall-icon">⚡</div>
+    <div class="paywall-title" id="paywall-title">Your free trial has ended</div>
+    <div class="paywall-sub" id="paywall-sub">Subscribe to continue.</div>
+    <div class="paywall-features">
+      <div class="paywall-feature"><span class="paywall-feature-icon">✓</span> Unlimited invoices & estimates</div>
+      <div class="paywall-feature"><span class="paywall-feature-icon">✓</span> Client portal with shareable links</div>
+      <div class="paywall-feature"><span class="paywall-feature-icon">✓</span> Branded PDF export with logo & signature</div>
+      <div class="paywall-feature"><span class="paywall-feature-icon">✓</span> Multi-currency support (8 currencies)</div>
+      <div class="paywall-feature"><span class="paywall-feature-icon">✓</span> Finance reports & analytics</div>
+    </div>
+    <div class="paywall-price"><span class="paywall-price-amount">$12</span><span class="paywall-price-period">/month</span><div class="paywall-trial-note">Cancel anytime · No hidden fees</div></div>
+    <button class="btn btn-primary" style="width:100%;padding:14px;font-size:15px;justify-content:center;margin-bottom:10px;" onclick="goToCheckout()">🍋 Subscribe Now — $12/mo</button>
+    <button class="btn btn-ghost" style="width:100%;padding:12px;font-size:13px;justify-content:center;" id="paywall-dismiss" onclick="dismissPaywall()">Maybe later</button>
+  </div>
+</div>
+
+<!-- EMAIL MODAL -->
+<div class="modal-overlay" id="email-modal">
+  <div class="modal">
+    <div class="modal-title">✉ Send Invoice</div>
+    <div class="modal-sub" id="email-modal-sub">Compose your email to the client</div>
+    <div class="pdf-note">📎 Your PDF invoice will be attached automatically after clicking Send</div>
+    <div class="email-field"><label class="email-label">To</label><input class="email-input" id="email-to" type="email" placeholder="client@email.com" /></div>
+    <div class="email-field"><label class="email-label">CC (optional)</label><input class="email-input" id="email-cc" type="email" placeholder="cc@email.com" /></div>
+    <div class="email-field"><label class="email-label">Subject</label><input class="email-input" id="email-subject" /></div>
+    <div class="email-field"><label class="email-label">Message</label><textarea class="email-textarea" id="email-body"></textarea></div>
+    <div class="email-summary" id="email-summary"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeEmailModal()">Cancel</button>
+      <button class="btn btn-ghost" onclick="downloadPDF();showToast('📎 PDF downloaded — attach it!')">↓ Download PDF First</button>
+      <button class="btn btn-primary" onclick="sendEmail()">✉ Open Email Client</button>
+    </div>
+  </div>
+</div>
+
+<!-- REMINDER MODAL -->
+<div class="modal-overlay" id="reminder-modal">
+  <div class="modal">
+    <div class="modal-title">Send Payment Reminder</div>
+    <div class="modal-sub" id="modal-sub">Sending reminder...</div>
+    <div class="reminder-preview">
+      Hi <strong id="rp-name">Client</strong>,<br><br>
+      This is a friendly reminder that invoice <strong id="rp-num">#INV</strong> for <strong id="rp-amount">$0</strong> is now due.<br><br>
+      Please let us know if you have any questions.<br><br>
+      Thank you for your continued business!<br>— <span id="rp-from">You</span>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeReminder()">Cancel</button>
+      <button class="btn btn-ghost" onclick="sendReminderWhatsApp()" style="color:#25d366;border-color:#25d366;">💬 WhatsApp</button>
+      <button class="btn btn-primary" onclick="sendReminder()">📧 Send Email Reminder</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"><span id="toast-msg">Done!</span></div>
+
+<script src="app.js"></script>
+</body>
+</html>
